@@ -2455,7 +2455,7 @@ def view_student_profile():
         if back == "m":
             StudentMenu(Stu.getFullName())
         elif back == "r":
-            pass
+            request_major_change(Stu.getID(), Stu.getFullName(), Stu.getMajor())
         elif back == "c":
             change_student_password(stu_name, Stu.getID())
 
@@ -2502,6 +2502,73 @@ def change_student_password(stu_name, stu_id):
         back = input("Your Password Has Been Changed. Press (B) To Go Back: ").lower()
         if back == "b":
             StudentMenu(stu_name)
+
+
+
+# REQUEST MAJOR CHANGE
+def request_major_change(student_id, student_name, current_major):
+    clear()
+    print("REQUEST MAJOR CHANGE")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    print(f"CURRENT MAJOR: {current_major}")
+    print()
+    while True:
+        new_major = input("Major Request: ")
+        if new_major != '':
+            break
+    # CHECKING IF C WAS ENTERED
+    if len(new_major) == 1:
+        new_major = new_major.lower()
+    if new_major == "c":
+        StudentMenu(student_name)
+
+    # TODO - CHECK IF MAJOR IS AVAILABLE BEFORE REQUESTING
+
+    # REASON
+    while True:
+        reason = input("What Is Your Reason For Wanting To Change Major? ")
+        if reason != '':
+            break
+    # CHECKING IF C WAS ENTERED
+    if len(reason) == 1:
+        reason = reason.lower()
+    if reason == "c":
+        StudentMenu(student_name)
+
+    # CONFIRMATION
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Request A Major Change? ").lower()
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        # SET UP NOTIFICATION
+        notification = f"Requesting Major Change From {current_major} To {new_major} Because: {reason}"
+        received_from = "Student"
+        date = now
+        stu_id = student_id
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, date, stu_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Request Has Been Successfully Sent. Press (M) To Return To Student Menu: ").lower()
+            if back == "m":
+                StudentMenu(student_name)
+
+    else:
+        StudentMenu(student_name)
+
+
+
 
 
 # VIEW ALL COURSES
