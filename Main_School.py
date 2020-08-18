@@ -2231,6 +2231,11 @@ def drop_student_from_course(course_name):
         name_to_drop = input("Enter The Name Of The Student: ")
         if name_to_drop != '':
             break
+    # CHECKING IF C WAS ENTERED
+    if len(name_to_drop) == 1:
+        name_to_drop = name_to_drop.lower()
+    if name_to_drop == "c":
+        ProfessorMenu(None)
     # CHECKING IF THE STUDENT WAS FOUND
     sql = "SELECT * FROM Student WHERE name = %s"
     val = (name_to_drop, )
@@ -2263,7 +2268,16 @@ def drop_student_from_course(course_name):
         db.execute(sql, val)
         students_in_course = db.fetchall()[0][0]
 
-        new_names_to_add_to_database = students_in_course.replace(name_to_drop, '').strip()
+        tmp_students_in_course = students_in_course.split()
+        new_names_to_add_to_database = ""
+
+        for i in range(len(tmp_students_in_course) // 2):
+            if tmp_students_in_course[i+i] + " " + tmp_students_in_course[i+i+1] != name_to_drop:
+                new_names_to_add_to_database += tmp_students_in_course[i+i] + " " + tmp_students_in_course[i+i+1]
+                new_names_to_add_to_database += " "
+
+        new_names_to_add_to_database = new_names_to_add_to_database.rstrip()
+
         sql = "UPDATE Course Set studentsInCourse = %s WHERE name = %s"
         val = (new_names_to_add_to_database, course_name)
         db.execute(sql, val)
@@ -2451,11 +2465,13 @@ def view_student_profile():
     print("-" * len(Stu.getAddress()) + "---------")
     print()
     while True:
-        back = input("Press (C) To Change Your Password:\nPress (R) To Request Major Change:\nPress (M) To Return To Student Menu: ").lower()
+        back = input("Press (C) To Change Your Password:\nPress (D) To Drop A Class:\nPress (R) To Request Major Change:\nPress (M) To Return To Student Menu: ").lower()
         if back == "m":
             StudentMenu(Stu.getFullName())
         elif back == "r":
             request_major_change(Stu.getID(), Stu.getFullName(), Stu.getMajor())
+        elif back == "d":
+            drop_class(Stu.getID(), Stu.getCoursesEnrolledIn())
         elif back == "c":
             change_student_password(stu_name, Stu.getID())
 
@@ -2659,7 +2675,7 @@ def select_course_stu(course_name):
             StudentMenu(None)
 
 
-
+# ENROLL IN COURSE
 def enroll_in_course(course_name):
     clear()
     print("----------------")
@@ -2724,6 +2740,71 @@ def enroll_in_course(course_name):
     else:
         StudentMenu(None)
 
+
+# DROP STUDENT FROM COURSE
+def drop_class(student_id, courses_enrolled_in):
+    clear()
+    print("DROP CLASS")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    print(f"CURRENT COURSES ENROLLED IN: {courses_enrolled_in}")
+    print()
+    while True:
+        class_to_drop = input("Enter The Name Of Class To Drop: ").upper()
+        if class_to_drop != '':
+            break
+    # CHECKING IF C WAS ENTERED
+    if len(class_to_drop) == 1:
+        class_to_drop = class_to_drop.lower()
+    if class_to_drop == "c":
+        StudentMenu(None)
+
+    # CHECKING IF THEY ARE ENROLLED IN THE CLASS THEY TRIED TO DROP
+    if class_to_drop not in courses_enrolled_in.split():
+        while True:
+            print()
+            error = input("You Are Not Enrolled In That Class. Press (T) To Try Again:\n"
+                          "                                    Press (M) To Return To Main Menu: ").lower()
+            if error == "t":
+                drop_class(student_id, courses_enrolled_in)
+            elif error == "m":
+                StudentMenu(None)
+
+    # CONFIRMATION
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Drop This Class? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        new_courses = ""
+        for course in courses_enrolled_in.split():
+            if course != class_to_drop:
+                new_courses += course
+                new_courses += " "
+
+        new_courses = new_courses.rstrip()
+
+        # UPDATE THEIR COURSES ENROLLED IN
+        sql = "UPDATE Student SET CoursesEnrolledIn = %s WHERE id = %s"
+        val = (new_courses, student_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        print()
+        print(f"You Dropped {class_to_drop}")
+        while True:
+            print()
+            back = input("Press (M) To Return To Student Menu: ").lower()
+            if back == "m":
+                StudentMenu(None)
+
+    else:
+        StudentMenu(None)
 
 
 # SANITIZE
