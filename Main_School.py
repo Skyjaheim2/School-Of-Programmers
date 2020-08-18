@@ -2504,7 +2504,6 @@ def change_student_password(stu_name, stu_id):
             StudentMenu(stu_name)
 
 
-
 # REQUEST MAJOR CHANGE
 def request_major_change(student_id, student_name, current_major):
     clear()
@@ -2658,6 +2657,7 @@ def select_course_stu(course_name):
             pass
         elif back == "m":
             StudentMenu(None)
+
 
 
 def enroll_in_course(course_name):

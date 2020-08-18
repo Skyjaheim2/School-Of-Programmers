@@ -6,5 +6,5 @@ design_doc.txt
 test.py
 .idea
 __pycache__
-
+.gitignore
 
