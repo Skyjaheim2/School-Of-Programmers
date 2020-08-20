@@ -629,29 +629,75 @@ def view_all_students():
             DeanMenu(None)
         elif tmp == "a":
             take_action_on_student()
-def view_all_majors(came_from):
+def view_all_majors(came_from=None):
     clear()
     print("---------------")
     print("VIEW ALL MAJORS")
     print("---------------")
     print()
     all_majors = Student.getAllMajors()
-    for i, major in enumerate(all_majors):
-        if major != all_majors[-1]:
-            print(major, end=", ")
-        else:
-            print(major, end="")
-        if i == 4:
-            print("\n")
+    for i in range(len(all_majors)):
+        print(all_majors[i][0])
+        print()
 
-    print()
-    print()
     while True:
+        print("-------------------------------------------")
         back = input("Press (D) To Get The Description Of A Major:\n"
-                     "Press (B) To Go Back: ")
-        if back == "b":
-            if came_from == "Update Student":
-                update_student_info()
+                     "Press (B) To Go Back: ").lower()
+        if back == "d":
+            while True:
+                print()
+                major_name = input("Enter The Name Of The Major: ")
+                if major_name != '':
+                    break
+            major_name = capitalize(major_name)
+            # CHECKING VALID MAJOR NAME WAS ENTERED
+            if not Student.checkIfMajorIsAvailableToSet(major_name):
+                while True:
+                    print()
+                    if came_from == "Dean":
+                        error = input("Invalid Major. Press (T) To Try Again:\nPress (M) To Return To Dean Menu: ").lower()
+                        if error == "t":
+                            view_all_majors("Dean")
+                        elif error == "m":
+                            DeanMenu(None)
+                    elif came_from == "Student":
+                        print()
+                        error = input(
+                            "Invalid Major. Press (T) To Try Again:\nPress (M) To Return To Student Menu: ").lower()
+                        if error == "t":
+                            view_all_majors("Student")
+                        elif error == "m":
+                            StudentMenu(None)
+
+            # GETTING THE DESCRIPTION OF THE MAJOR
+            sql = "SELECT description FROM Major WHERE name = %s"
+            val = (major_name, )
+            db.execute(sql, val)
+            major_description = db.fetchall()[0][0]
+
+            clear()
+            print("-" * len(major_name))
+            print(major_name.upper())
+            print("-" * len(major_name))
+            print()
+            print(major_description)
+
+            while True:
+                print()
+                if came_from == "Dean":
+                    back = input("Press (C) To View More Majors:\nPress (M) To Return To Dean Menu: ").lower()
+                    if back == "c":
+                        view_all_majors("Dean")
+                    elif back == "m":
+                        DeanMenu(None)
+                elif came_from == "Student":
+                    back = input("Press (C) To View More Majors:\nPress (M) To Return To Student Menu: ").lower()
+                    if back == "c":
+                        view_all_majors("Student")
+                    elif back == "m":
+                        StudentMenu(None)
+
 
 # TAKE ACTION ON STUDENT
 def take_action_on_student(name=None):
@@ -667,7 +713,7 @@ def take_action_on_student(name=None):
             student_name = input("Enter The Name Of The Student: ")
             if student_name != '':
                 break
-        update_student_info(name=student_name)
+        update_student_info(name=student_name, came_from="take_action")
     else:
         update_student_info(name=name)
 
@@ -823,6 +869,8 @@ def update_student(current_change, column, name):
         student_name = input("Enter The Name Of The Student: ")
     else:
         student_name = name
+
+    # name = student_name
     print()
     # CHECKING IF C WAS ENTERED
     if len(student_name) == 1:
@@ -865,7 +913,7 @@ def update_student(current_change, column, name):
                 error = input("Can't Set Course Check If All Courses Entered Are Available. Press (T) To Try Again:\n"
                               "                                                             Press (M) To Return To Dean Menu: ").lower()
                 if error == "t":
-                    update_student('Courses Enrolled In', 'CoursesEnrolledIn', name)
+                    update_student('Courses Enrolled In', 'CoursesEnrolledIn', student_name)
                 elif error == "m":
                     DeanMenu(None)
 
@@ -876,7 +924,7 @@ def update_student(current_change, column, name):
                               f"                                               Press (M) To Return To Dean Menu: ").lower()
 
                 if error == "t":
-                    update_student('Courses Enrolled In', 'CoursesEnrolledIn', name)
+                    update_student('Courses Enrolled In', 'CoursesEnrolledIn', student_name)
                 elif error == "m":
                     DeanMenu(None)
 
@@ -979,9 +1027,9 @@ def update_student(current_change, column, name):
                               "                                                              Press (S) To See All Majors:\n"
                               "                                                              Press (M) To Return To Main Menu: ").lower()
                 if error == "t":
-                    update_student('Courses Enrolled In', 'CoursesEnrolledIn', name)
+                    update_student('Major', 'major', student_name)
                 elif error == "s":
-                    view_all_majors("Update Student")
+                    view_all_majors("Dean")
                 elif error == "m":
                     DeanMenu(None)
 
@@ -2411,8 +2459,8 @@ def StudentMenu(name):
     print("AVAILABLE OPTIONS")
     print()
     print("1 - View Profile")
-    print("2 - View All Courses") # TODO - Enroll And Drop Classes
-    print("3 - View All Majors")  # TODO - View And Request Major Change
+    print("2 - View All Courses")
+    print("3 - View All Majors")
 
     print()
     while True:
@@ -2427,7 +2475,7 @@ def StudentMenu(name):
     elif stu_choice == "2":
         view_all_courses_stu()
     elif stu_choice == "3":
-        view_courses_taught()
+        view_all_majors("Student")
 
 
 # VIEW STUDENT PROFILE
@@ -2541,7 +2589,29 @@ def request_major_change(student_id, student_name, current_major):
     if new_major == "c":
         StudentMenu(student_name)
 
-    # TODO - CHECK IF MAJOR IS AVAILABLE BEFORE REQUESTING
+    new_major = capitalize(new_major)
+    if not Student.checkIfMajorIsAvailableToSet(new_major):
+        while True:
+            print()
+            error = input("Invalid Major. Press (T) To Try Again:\n"
+                          "               Press (S) To See All Majors:\n"
+                          "               Press (M) To Return To Student Menu: ").lower()
+            if error == "t":
+                request_major_change(student_id, student_name, current_major)
+            elif error == "s":
+                view_all_majors("Student")
+            elif error == "m":
+                StudentMenu(None)
+
+    if new_major == current_major:
+        while True:
+            print()
+            error = input("You Are Already In That Major. Press (T) To Try Again:\n"
+                          "                               Press (M) To Return To Student Menu: ").lower()
+            if error == "t":
+                request_major_change(student_id, student_name, current_major)
+            elif error == "m":
+                StudentMenu(None)
 
     # REASON
     while True:
@@ -2991,6 +3061,16 @@ def check_password_hash(password, hash):
         return True
     return False
 
+def capitalize(word):
+    word_to_return = ""
+    all_words = [word.capitalize() for word in word.split()]
+
+    for word in all_words:
+        word_to_return += word
+        word_to_return += " "
+
+    word_to_return = word_to_return.rstrip()
+    return word_to_return
 
 def update_course_database():
     # UPDATING studentsInCourse

@@ -71,11 +71,14 @@ class Student(Person):
 
     @classmethod
     def getAllMajors(cls):
-        all_major = ["Computer Science", "Computer System Administration", "Applied Mathematics","Biomedical Engineering",
-                     "Chemical Engineering", "Industrial Engineering", "Aerospace Engineering", "Computer Engineering",
-                     "Electrical Engineering", "Physics"]
+        sql = "SELECT name FROM Major"
+        db.execute(sql)
+        all_majors = db.fetchall()
 
-        return all_major
+        return all_majors
+
+
+
 
 
     # STATIC METHODS
@@ -91,7 +94,8 @@ class Student(Person):
 
     @staticmethod
     def checkIfMajorIsAvailableToSet(major):
-        if major not in Student.getAllMajors():
+        all_majors = [Student.getAllMajors()[i][0] for i in range(len(Student.getAllMajors()))]
+        if major not in all_majors:
             return False
         return True
 
