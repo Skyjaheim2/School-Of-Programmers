@@ -47,16 +47,17 @@ class Student(Person):
     def getGrades(self):
         if self.__grades == None:
             return None
-        current_courses = self.getCoursesEnrolledIn().split()
-        grades = self.getGradesForAverage()
-        if grades == None or current_courses == None:
-            return None
-        grades_to_return = ""
-
-        for i in range(len(grades)):
-            grades_to_return += current_courses[i] + ":" + " " + grades[i] + "%" + " "
-
-        return grades_to_return.rstrip()
+        return self.__grades
+        # current_courses = self.getCoursesEnrolledIn().split()
+        # grades = self.getGradesForAverage()
+        # if grades == None or current_courses == None:
+        #     return None
+        # grades_to_return = ""
+        #
+        # for i in range(len(grades)):
+        #     grades_to_return += current_courses[i] + ":" + " " + grades[i] + "%" + " "
+        #
+        # return grades_to_return.rstrip()
 
 
     def getMajor(self):

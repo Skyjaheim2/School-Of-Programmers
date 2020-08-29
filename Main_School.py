@@ -1,14 +1,13 @@
 import os
 clear = lambda: os.system("cls")
 import hashlib
+from stdiomask import getpass
 try:
     import mysql.connector
 except ImportError:
     print("Import Error: Do pip install mysql.connector-python To Use This Program")
-import datetime
 from datetime import date
-from time import sleep
-import random
+
 current_date = date.today()
 now = current_date.strftime("%B %d, %Y")
 
@@ -18,8 +17,10 @@ from Course import Course
 from Person import Person
 from Student import Student
 
+db_user = os.environ.get("DB_USER")
+db_password = os.environ.get('DB_PASSWORD')
 
-mydb = mysql.connector.connect(host="localhost", user="root", passwd="jaheimSQL18", database="student")
+mydb = mysql.connector.connect(host="localhost", user=db_user, passwd=db_password, database="student")
 
 db = mydb.cursor()
 
@@ -58,6 +59,7 @@ def login():
 # DEAN LOGIN
 def DeanLogin():
     clear()
+    global dean_name
     print("LOGIN AS DEAN")
     print(now)
     print("-------------------")
@@ -80,7 +82,7 @@ def DeanLogin():
     if len(result) == 0:
         not_registered("Dean")
 
-    dean_password = input("Enter Your Password: ")
+    dean_password = getpass("Enter Your Password: ")
     # CHECKING IF THE PASSWORD MATCHES
     if not check_password_hash(dean_password, hashed_password):
         incorrect_password("Dean")
@@ -116,7 +118,7 @@ def ProfessorLogin():
         not_registered("Professor")
 
 
-    prof_password = input("Enter Your Password: ")
+    prof_password = getpass("Enter Your Password: ")
     # CHECKING IF THE PASSWORD MATCHES
     if not check_password_hash(prof_password, hashed_password):
         incorrect_password("Professor")
@@ -152,7 +154,7 @@ def StudentLogin():
     if len(result) == 0:
         not_registered("Student")
 
-    stu_password = input("Enter Your Password: ")
+    stu_password = getpass("Enter Your Password: ")
     # CHECKING IF THE PASSWORD MATCHES
     if not check_password_hash(stu_password, hashed_password):
         incorrect_password("Student")
@@ -547,13 +549,22 @@ def register_as_student():
 # DEAN MENU
 def DeanMenu(name):
     clear()
+    # GETTING INBOX COUNT
+    sql = "SELECT COUNT(*) FROM dean_notification"
+    db.execute(sql)
+    inbox_count = db.fetchall()[0][0]
     print("DEAN MENU")
     if name != None:
         print(f"Welcome {name}")
     print(now)
-    print("--------------------")
+    print("------------------------------")
     print("Press (L) To Log Out")
-    print("--------------------")
+    print("Press (S) To Send Notification")
+    print("Press (A) To Open Inbox")
+    print("------------------------------")
+    print()
+    print(f"INBOX: {inbox_count}")
+    print()
     print()
     print("AVAILABLE OPTIONS")
     print()
@@ -565,12 +576,16 @@ def DeanMenu(name):
 
     print()
     while True:
-        user_choice  = input("Choose An Option: ")
+        user_choice  = input("Choose An Option: ").lower()
         # CHECKING IF L WAS ENTERED
         if len(user_choice) == 1:
             user_choice = user_choice.lower()
         if user_choice == "l":
             login()
+        elif user_choice == "a":
+            dean_inbox()
+        elif user_choice == "s":
+            dean_send_notification()
         elif  user_choice == "1":
             view_all_students()
         elif user_choice == "2":
@@ -898,7 +913,7 @@ def update_student(current_change, column, name):
     elif current_change == "Phone Number":
         print(f"CURRENT PHONE NUMBER: {Stu.getPhoneNumber()}")
     elif current_change == "Courses Enrolled In":
-        print(f"CURRENT COURSES ENROLLED IN: {Stu.getCoursesEnrolledIn()}")
+        print(f"CURRENT COURSES ENROLLED IN: {Stu.getCoursesEnrolledIn().split()}")
         before_change = Stu.getCoursesEnrolledIn()
         print()
         new_courses = input("Enter Their New Courses: ")
@@ -911,9 +926,12 @@ def update_student(current_change, column, name):
             while True:
                 print()
                 error = input("Can't Set Course Check If All Courses Entered Are Available. Press (T) To Try Again:\n"
+                              "                                                             Press (V) To View All Courses:\n"
                               "                                                             Press (M) To Return To Dean Menu: ").lower()
                 if error == "t":
                     update_student('Courses Enrolled In', 'CoursesEnrolledIn', student_name)
+                elif error == "v":
+                    view_all_courses_dean()
                 elif error == "m":
                     DeanMenu(None)
 
@@ -944,10 +962,15 @@ def update_student(current_change, column, name):
 
             db.execute(sql, val)
             mydb.commit()
-
             update_course_database()
+
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (f"You Were Enrolled In: {Stu.getCoursesEnrolledIn()}","Dean", now, Stu.getID())
+            db.execute(sql, val)
+            mydb.commit()
             print()
-            print(f"You Changed {student_name} Courses Enrolled From {before_change} To {Stu.getCoursesEnrolledIn()}")
+            print(f"You Changed {student_name} Courses Enrolled In From {before_change} To {Stu.getCoursesEnrolledIn()}")
             print()
             while True:
                 back = input("Press (U) To Update More Students Info:\nPress (M) To Return To Dean Menu: ").lower()
@@ -958,13 +981,17 @@ def update_student(current_change, column, name):
         else:
             update_student_info(name=student_name)
     elif current_change == "Grades":
-        if Stu.getGrades() != None:
-            print("-" * len(Stu.getGrades()) + "----------------")
-        print(f"CURRENT GRADES: {Stu.getGrades()}")
+        current_grades = Stu.getGrades()
+
+        if current_grades != None:
+            print("-" * len(current_grades) + "----------------")
+
+        print(f"CURRENT GRADES: {current_grades}")
+
         print(f"GPA: {Stu.getGPA()}")
-        if Stu.getGrades() != None:
-            print("-" * len(Stu.getGrades()) + "----------------")
-        before_change = Stu.getGrades()
+        if current_grades != None:
+            print("-" * len(current_grades) + "----------------")
+        before_change = current_grades
         print()
         # CONFIRMATION
         while True:
@@ -975,35 +1002,38 @@ def update_student(current_change, column, name):
         if confirmation == "yes":
             print()
             Stu.setGrades()
+            # UPDATE GRADES
+            sql = f"UPDATE Student SET {column} = %s WHERE name = %s"
+            val = (Stu.getGrades(), student_name)
+            db.execute(sql, val)
+            mydb.commit()
+
+            # UPDATE GPA
+            sql = f"UPDATE Student SET GPA = %s WHERE name = %s"
+            val = (Stu.getGPA(), student_name)
+
+            db.execute(sql, val)
+            mydb.commit()
+            update_course_database()
+
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (f"Your Grades Have Been Updated To: {Stu.getGrades()}", "Dean", now, Stu.getID())
+            db.execute(sql, val)
+            mydb.commit()
+            print()
+            print(f"You Changed {student_name} Grades From |{before_change}| To |{Stu.getGrades()}|")
+            print()
+            print(f"{student_name} GPA IS NOW: {Stu.getGPA()}")
+            print()
+            while True:
+                back = input("Press (U) To Update More Students Info:\nPress (M) To Return To Dean Menu: ").lower()
+                if back == "u":
+                    update_student_info()
+                elif back == "m":
+                    DeanMenu(None)
         else:
             update_student_info(name=student_name)
-
-        # UPDATE GRADES
-        sql = f"UPDATE Student SET {column} = %s WHERE name = %s"
-        val = (Stu.getGrades(), student_name)
-
-        db.execute(sql, val)
-        mydb.commit()
-
-        # UPDATE GPA
-        sql = f"UPDATE Student SET GPA = %s WHERE name = %s"
-        val = (Stu.getGPA(), student_name)
-
-        db.execute(sql, val)
-        mydb.commit()
-
-        update_course_database()
-        print()
-        print(f"You Changed {student_name} Grades From |{before_change}| To |{Stu.getGrades()}|")
-        print()
-        print(f"{student_name} GPA IS NOW: {Stu.getGPA()}")
-        print()
-        while True:
-            back = input("Press (U) To Update More Students Info:\nPress (M) To Return To Dean Menu: ").lower()
-            if back == "u":
-                update_student_info()
-            elif back == "m":
-                DeanMenu(None)
     elif current_change == "Major":
         if Stu.getMajor() != None:
             print("-" * len(Stu.getMajor()) + "----------------")
@@ -1048,6 +1078,12 @@ def update_student(current_change, column, name):
             db.execute(sql, val)
             mydb.commit()
 
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (f"Your Major Has Been Changed From: {before_change} To {Stu.getMajor()}", "Dean", now, Stu.getID())
+            db.execute(sql, val)
+            mydb.commit()
+
             print()
             print(f"You Changed {student_name} Major From {before_change} To {Stu.getMajor()}")
             print()
@@ -1079,6 +1115,11 @@ def update_student(current_change, column, name):
         db.execute(sql, val)
         mydb.commit()
 
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+        val = (f"Your {current_change} Has Been Changed To: {update_changes}", "Dean", now, Stu.getID())
+        db.execute(sql, val)
+        mydb.commit()
 
         print()
         print(f"You Changed {student_name} {current_change} To {update_changes}")
@@ -1147,6 +1188,210 @@ def no_person_found(came_from=None, argv=None):
                 update_professor_info()
             elif tmp == "m":
                 DeanMenu(None)
+
+    elif came_from == "Notification":
+        if argv == "Dean":
+            menu = "Dean Menu"
+            who = "Dean"
+        elif argv == "Prof":
+            menu = "Professor Menu"
+            who = "Professor"
+        elif argv == "Stu":
+            menu = "Student Menu"
+            who = "Student"
+        while True:
+            print()
+            print(f"That {who} Was Not Found")
+            print()
+            tmp = input(f"Press (T) To Try Again:\nPress (M) To Return To {menu}")
+
+            if tmp == "t":
+                if argv == "Prof":
+                    prof_send_notification()
+                elif argv == "Dean":
+                    dean_send_notification()
+                elif argv == "Stu":
+                    stu_send_notification()
+            elif tmp == "m":
+                if argv == "Prof":
+                    ProfessorMenu(None)
+                elif argv == "Dean":
+                    ProfessorMenu(None)
+                elif argv == "Stu":
+                    StudentMenu(None)
+
+# DEAN VIEW ALL COURSES
+def view_all_courses_dean():
+    clear()
+    print("----------------")
+    print("VIEW ALL COURSES")
+    print("----------------")
+    print()
+    all_courses = Course.getAll_Courses()
+    db.execute("SELECT description FROM Course")
+
+    description = db.fetchall()
+
+    for i, course in enumerate(all_courses):
+        index = 0
+        # SEPARATE THE FULL COURSE NAME FROM THE DESCRIPTION
+        for j in range(len(description)):
+            if description[i][0][j] == ':':
+                break
+            index += 1
+
+        print(f"{all_courses[i][0]} - {description[i][0][:index]}")
+        print()
+
+    while True:
+        dean_choice = input("Press (S) To Select A Course:\nPress (M) To Return To Dean Menu: ").lower()
+        if dean_choice == "s":
+            search_for_course_dean()
+        elif dean_choice == "m":
+            DeanMenu(None)
+# DEAN SELECT COURSE
+def select_course_dean(course_name):
+    clear()
+    course = Course(course_name)
+
+    print("-" * len(course_name) + "-------")
+    print(f"{course_name.upper()} COURSE")
+    print("-" * len(course_name) + "-------")
+    print()
+    print("<<<<<<<<<<<<<<<< DESCRIPTION >>>>>>>>>>>>>>>>")
+    print()
+    print(course.getDescription())
+    print()
+    print()
+
+    print("-" * len(course) + "------------------")
+    print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
+    print(f"Class Size: {course.getStudentCountInCourse()}")
+    print("-" * len(course) + "------------------")
+    print()
+
+    while True:
+        print("Press (S) To Search Again:")
+        print("Press (E) To Enroll A Student In This Course:")
+        back = input("Press (M) To Return To Student Menu: ").lower()
+        if back == "s":
+            search_for_course_dean("Search")
+        elif back == "e":
+            enroll_student_in_course(course_name)
+        elif back == "m":
+            DeanMenu(None)
+# SEARCH FOR COURSE DEAN
+def search_for_course_dean(came_from=None):
+    if came_from != None:
+        clear()
+    while True:
+        print()
+        course_name = input("Enter The Name Of The Course: ").upper()
+        if course_name != '':
+            break
+    # CHECK IF COURSE ENTERED IS IN THE LIST
+    sql = "SELECT name FROM Course WHERE name = %s"
+    val = (course_name,)
+    db.execute(sql, val)
+    result = db.fetchall()
+    if len(result) == 0:
+        course_not_found()
+
+    # COURSE WAS FOUND
+    select_course_dean(course_name)
+# STUDENT ENROLL IN COURSE
+def enroll_student_in_course(course_name):
+    clear()
+    print("ENROLL STUDENT IN COURSE")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    # GET ALL THE COURSES CURRENTLY ENROLLED
+    while True:
+        print()
+        stu_name = input("Enter The Name Of The Student: ")
+        if stu_name != '':
+            break
+
+    # CHECKING IF C WAS ENTERED
+    if len(stu_name) == 1:
+        stu_name = stu_name.lower()
+    if stu_name == "c":
+        DeanMenu(None)
+
+    sql = "SELECT CoursesEnrolledIn From Student WHERE name = %s"
+    val = (stu_name,)
+    db.execute(sql, val)
+    courses_enrolled_in = db.fetchall()[0][0]
+    print()
+    print(f"Courses {stu_name} Is Currently Enrolled In: {courses_enrolled_in.split()}")
+
+    # CHECK IF THE STUDENT IS ALREADY ENROLLED IN THE COURSE
+    for course in courses_enrolled_in.split():
+        if course_name == course:
+            print()
+            while True:
+                print()
+                back = input(f"Student Is Already Enrolled In This Course. Press (S) To Return To All Courses:\n"
+                             "                                             Press (M) To Return To Dean Menu: ").lower()
+                if back == "s":
+                    view_all_courses_dean()
+                elif back == "m":
+                    DeanMenu(None)
+
+
+    # CHECKING IF STUDENT CANT ENROLL IN ANY MORE COURSES
+    if len(courses_enrolled_in.split()) == Student.MAX_COURSES_STUDENT_CAN_ENROLL_IN:
+        while True:
+            print()
+            print(f"Student Can't Enroll In More Than {Student.MAX_COURSES_STUDENT_CAN_ENROLL_IN} Courses.")
+            print()
+            back = input("Press (S) To Return To All Courses\nPress (M) To Return To Dean Menu: ").lower()
+            if back == "s":
+                view_all_courses_dean()
+            elif back == "m":
+                DeanMenu(None)
+
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Are You Sure You Want To Enroll {stu_name} In {course_name}? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+    if confirmation == "yes":
+        Stu = Student(stu_name.split()[0], stu_name.split()[1], None, None, None, None, None, None)
+
+        new_courses_to_add = courses_enrolled_in + " " + course_name
+        sql = "UPDATE Student SET CoursesEnrolledIn = %s WHERE id = %s"
+        val = (new_courses_to_add, Stu.getID())
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name, )
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (f"{stu_name} Has Been Enrolled In: {course_name}", "Dean", now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            print(f"{stu_name} Has Been Successfully Enrolled In {course_name}")
+            print()
+            back = input(f"Press (S) To Return To All Courses:\nPress (M) To Return To Dean Menu: ").lower()
+            if back == "s":
+                view_all_courses_dean()
+            elif back == "m":
+                DeanMenu(None)
+    else:
+        DeanMenu(None)
+
+
 
 # REGISTER STUDENT
 def register_student():
@@ -1328,7 +1573,350 @@ def unregister_student():
             DeanMenu(None)
 
 
+# DEAN INBOX
+def dean_inbox():
+    clear()
+    print("----------")
+    print("YOUR INBOX")
+    print("----------")
+    print(now)
+    print()
 
+    sql = "SELECT id, notification, received_from, date, person_id FROM dean_notification"
+    db.execute(sql)
+    all_notifications = db.fetchall()
+
+
+    if len(all_notifications) == 0:
+        print("No Notifications")
+
+
+    for i in range(len(all_notifications)):
+        print("-" * len(all_notifications[i][1]) + "---------")
+        print(f"Id: {all_notifications[i][0]}")
+        print(f"Date: {all_notifications[i][3]}")
+        print(f"Received From: {all_notifications[i][2]} Id: {all_notifications[i][4]}")
+        print(f"Message: {all_notifications[i][1]}")
+        print("-" * len(all_notifications[i][1]) + "---------")
+        print()
+
+    while True:
+        print()
+        print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
+        print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
+        print("Press (M) To Filter By Message:           |  Press (S) To Return To Dean Menu:")
+        print()
+        filter = input("Choose An Option: ")
+        if filter == "d":
+            filter_dean_notification_by_date(all_notifications)
+        elif filter == "f":
+            filter_dean_notification_by_received_from(all_notifications)
+        elif filter == "m":
+            filter_dean_notification_by_message(all_notifications)
+        elif filter == "c":
+            clear_dean_notification()
+        elif filter == "ca":
+            clear_all_dean_notifications()
+        elif filter == "s":
+            DeanMenu(None)
+
+# FILTER DEAN NOTIFICATIONS
+def filter_dean_notification_by_date(notifications):
+    while True:
+        print()
+        date_to_filter = input("Enter The Date: ")
+        if date_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(date_to_filter) + "--------------")
+    print(f"Filtered by: {date_to_filter}")
+    print("-" * len(date_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if date_to_filter in notifications[0][3]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Dean Menu: ").lower()
+        if back == "f":
+            dean_inbox()
+        if back == "c":
+            clear_dean_notification()
+        elif back == "s":
+            DeanMenu(None)
+def filter_dean_notification_by_received_from(notifications):
+    while True:
+        print()
+        person_to_filter = input("Enter The Name: ")
+        person_to_filter = capitalize(person_to_filter)
+        if person_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(person_to_filter) + "--------------")
+    print(f"Filtered by: {person_to_filter}")
+    print("-" * len(person_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if person_to_filter in notifications[i][2]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Dean Menu: ").lower()
+        if back == "f":
+            dean_inbox()
+        elif back == "c":
+            clear_dean_notification()
+        elif back == "s":
+            DeanMenu(None)
+def filter_dean_notification_by_message(notifications):
+    while True:
+        print()
+        message_to_filter = input("Enter The Message: ")
+        if message_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(message_to_filter) + "--------------")
+    print(f"Filtered by: {message_to_filter}")
+    print("-" * len(message_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if message_to_filter in notifications[i][1]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id : {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Dean Menu: ").lower()
+        if back == "f":
+            dean_inbox()
+        elif back == "c":
+            clear_dean_notification()
+        elif back == "s":
+            DeanMenu(None)
+def clear_dean_notification():
+    while True:
+        print()
+        notification_id = input("Enter The Id Of The Notification: ")
+        if notification_id != '' and notification_id.isdigit():
+            break
+
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Clear This Notifications? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        sql = "DELETE FROM dean_notification WHERE id = %s"
+        val = (int(notification_id), )
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Notification Deleted. Press (M) To Return To Dean Menu: ").lower()
+            if back == "m":
+                DeanMenu(None)
+    else:
+        DeanMenu(None)
+
+def clear_all_dean_notifications():
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Clear All Notifications? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        sql = "DELETE FROM dean_notification"
+        db.execute(sql)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("All Notifications Cleared. Press (M) To Return To Dean Menu: ").lower()
+            if back == "m":
+                DeanMenu(None)
+    else:
+        DeanMenu(None)
+
+# DEAN SEND NOTIFICATION
+def dean_send_notification():
+    clear()
+    print("SEND NOTIFICATION")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    while True:
+        print()
+        to = input("To (Dean, Professor, Or Student): ").capitalize()
+        if to != '' and (to == "Student" or to == "Professor" or to == "Dean"):
+            break
+        if to == '' or (to != "Student" or to != "Professor" or to != "Dean"):
+            print("Messages Can Only Be Sent To: Dean, Professor Or Student")
+
+    # CHECKING IF C WAS ENTERED
+    if len(to) == 1:
+        to = to.lower()
+    if to == "c":
+        DeanMenu(None)
+
+    # STUDENT
+    if to == "Student":
+        while True:
+            print()
+            stu_name = capitalize(input("Enter The Name Of The Student: "))
+            if stu_name != '':
+                break
+        sql = "SELECT id FROM Student WHERE name = %s"
+        val = (stu_name, )
+        db.execute(sql, val)
+        stu_id = db.fetchall()
+        if len(stu_id) == 0:
+            no_person_found("Notification", "Dean")
+        stu_id = stu_id[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Dean ({dean_name})", now, stu_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Dean Menu: ").lower()
+            if back == "s":
+                dean_send_notification()
+            elif back == "m":
+                DeanMenu(None)
+
+    # PROFESSOR
+    elif to == "Professor":
+        while True:
+            print()
+            professor_name = capitalize(input("Enter The Name Of The Professor: "))
+            if professor_name != '':
+                break
+        sql = "SELECT id FROM Professor WHERE name = %s"
+        val = (professor_name, )
+        db.execute(sql, val)
+        prof_id = db.fetchall()
+        if len(prof_id) == 0:
+            no_person_found("Notification", "Dean")
+        prof_id = prof_id[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Dean ({dean_name})", now, prof_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Dean Menu: ").lower()
+            if back == "s":
+                dean_send_notification()
+                break
+            elif back == "m":
+                DeanMenu(None)
+                break
+
+    # DEAN
+    elif to == "Dean":
+        while True:
+            print()
+            deanName = capitalize(input("Enter The Name Of The Dean: "))
+            if deanName != '':
+                break
+        # CHECKING IF CORRECT NAME WAS ENTERED
+        sql = "SELECT * FROM Dean WHERE name = %s"
+        val = (deanName,)
+        db.execute(sql, val)
+        result = db.fetchall()
+        if len(result) == 0:
+            no_person_found("Notification", "Dean")
+
+        # GETTING THE ID OF THE DEAN
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name, )
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Dean ({dean_name})", now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Dean Menu: ").lower()
+            if back == "s":
+                dean_send_notification()
+                break
+            elif back == "m":
+                DeanMenu(None)
+                break
 
 
 # ------ PROFESSOR RELATED OPTIONS ------#
@@ -1383,7 +1971,7 @@ def take_action_on_professor(name=None):
                 break
         update_professor_info(name=professor_name)
     else:
-        update_professor_info(name=name)
+        update_professor_info("Take Action",name)
 
 # VIEW SPECIFIC PROFESSOR
 def view_specific_professor():
@@ -1603,6 +2191,12 @@ def update_professor(current_change, column, name):
             db.execute(sql, val)
             mydb.commit()
 
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+            val = (f"Your Salary Has Been Changed From: {before_change} To: {Prof.getSalary()}", "Dean", now, Prof.getID())
+            db.execute(sql, val)
+            mydb.commit()
+
             print()
             print(f"You Changed {professor_name} Salary To {Prof.getSalary()}")
             print()
@@ -1638,11 +2232,11 @@ def update_professor(current_change, column, name):
             while True:
                 print()
                 error = input(
-                    f"Cant Enroll In More Than {Prof.MAX_COURSES_A_PROFESSOR_CAN_TEACH} Courses. Press (T) To Try Again:\n"
-                    f"                                    Press (M) To Return To Dean Menu: ").lower()
+                    f"Cant Teach More Than {Prof.MAX_COURSES_A_PROFESSOR_CAN_TEACH} Courses. Press (T) To Try Again:\n"
+                    f"                                Press (M) To Return To Dean Menu: ").lower()
 
                 if error == "t":
-                    update_professor('Courses Taught', 'CoursesTaught', name)
+                    update_professor('Courses Taught', 'CoursesTaught', professor_name)
                 elif error == "m":
                     DeanMenu(None)
 
@@ -1659,6 +2253,13 @@ def update_professor(current_change, column, name):
             sql = f"UPDATE Professor SET {column} = %s WHERE name = %s"
             # getCoursesTaught() RETURNS A LIST SO I REMOVED THE LIST AND THE COMMAS AND JUST ADDED THE COURSE NAMES
             val = (', '.join(Prof.getCoursesTaught()).replace(',', ''), professor_name)
+
+            db.execute(sql, val)
+            mydb.commit()
+
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+            val = (f"The Courses You Teach Has Been Changed To: {Prof.getCoursesTaught()}", "Dean", now, Prof.getID())
 
             db.execute(sql, val)
             mydb.commit()
@@ -1692,6 +2293,12 @@ def update_professor(current_change, column, name):
         sql = f"UPDATE Professor SET {column} = %s WHERE name = %s"
         val = (update_changes, professor_name)
 
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+        val = (f"Your {current_change} Has Been Changed To: {update_changes}", "Dean", now, Prof.getID())
         db.execute(sql, val)
         mydb.commit()
 
@@ -1942,13 +2549,23 @@ def unregister_professor():
 # PROFESSOR MENU
 def ProfessorMenu(name):
     clear()
+    # GETTING INBOX COUNT
+    Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+    sql = "SELECT COUNT(*) FROM professor_notification WHERE prof_id = %s"
+    val = (Prof.getID(), )
+    db.execute(sql, val)
+    inbox_count = db.fetchall()[0][0]
     print("PROFESSOR MENU")
     if name != None:
         print(f"Welcome {name}")
     print(now)
-    print("--------------------")
+    print("-----------------------")
     print("Press (L) To Log Out")
-    print("--------------------")
+    print("Press (S) To Send Notification")
+    print("Press (A) To Open Inbox")
+    print("-----------------------")
+    print()
+    print(f"INBOX: {inbox_count}")
     print()
     print("AVAILABLE OPTIONS")
     print()
@@ -1963,14 +2580,16 @@ def ProfessorMenu(name):
 
     if prof_choice == "l":
         login()
+    elif prof_choice == "a":
+        professor_inbox()
+    elif prof_choice == "s":
+        prof_send_notification()
     elif prof_choice == "1":
         view_prof_profile()
     elif prof_choice == "2":
         view_all_courses_prof()
     elif prof_choice == "3":
         view_courses_taught()
-
-
 
 # VIEW PROFESSOR PROFILE
 def view_prof_profile():
@@ -2045,7 +2664,6 @@ def view_all_courses_prof():
         elif prof_choice == "m":
             ProfessorMenu(None)
 
-
 # SEARCH FOR COURSE
 def search_for_course_prof(came_from=None):
     if came_from != None:
@@ -2066,7 +2684,7 @@ def search_for_course_prof(came_from=None):
     # COURSE WAS FOUND
     select_course_prof(course_name)
 
-
+# VIEW COURSES TAUGHT
 def view_courses_taught():
     clear()
     print("-----------------")
@@ -2106,6 +2724,13 @@ def view_courses_taught():
         db.execute(sql, val)
         mydb.commit()
 
+        # SET UP NOTIFICATION
+        Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (f"{prof_name} Changed Their Courses Teached To: {new_courses}", "Professor", now, Prof.getID())
+        db.execute(sql, val)
+        mydb.commit()
+
         while True:
             print()
             back = input("Courses Taught Successfully Updated. Press (M) To Return To Professor Menu: ").lower()
@@ -2114,6 +2739,7 @@ def view_courses_taught():
     else:
         ProfessorMenu(None)
 
+# COURSE NOT FOUND
 def course_not_found():
     print()
     while True:
@@ -2212,11 +2838,6 @@ def select_course_prof(course_name):
         elif back == "m":
             ProfessorMenu(None)
 
-
-
-
-
-
 # ADD COURSE TO LIST OF COURSES TEACHED
 def add_course_to_list_of_courses_teached(course_name):
     clear()
@@ -2256,10 +2877,17 @@ def add_course_to_list_of_courses_teached(course_name):
         db.execute(sql, val)
         mydb.commit()
 
+        # SET UP NOTIFICATION
+        Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (f"{prof_name} Added {course_name} To Their Schedule", "Professor", now, Prof.getID())
+        db.execute(sql, val)
+        mydb.commit()
+
         while True:
             print()
-            back = input("Course Successfully Added. Press (S) To Return To All Courses:\n"
-                         "                           Press (M) To Return To Professor Menu: ").lower()
+            back = input("Courses Successfully Added. Press (S) To Return To All Courses:\n"
+                         "                            Press (M) To Return To Professor Menu: ").lower()
             if back == "s":
                 view_all_courses_prof()
             elif back == "m":
@@ -2356,6 +2984,13 @@ def drop_student_from_course(course_name):
         db.execute(sql, val)
         mydb.commit()
 
+        # SEND NOTIFICATION TO DEAN
+        Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (f"{prof_name} Dropped: {name_to_drop} For: {reason}", "Professor", now, Prof.getID())
+        db.execute(sql, val)
+        mydb.commit()
+
         update_course_database()
         print()
         while True:
@@ -2394,8 +3029,6 @@ def view_student_grade_for_course(students_in_course, num_students_in_course, co
             select_course_prof(course_name)
         elif back == "m":
             ProfessorMenu(None)
-
-
 
 # CHANGE PROFESSOR PASSWORD
 def change_professor_password(prof_name, prof_id):
@@ -2440,21 +3073,471 @@ def change_professor_password(prof_name, prof_id):
         if back == "b":
             ProfessorMenu(prof_name)
 
+# PROF SEND NOTIFICATION
+def prof_send_notification():
+    clear()
+    print("SEND NOTIFICATION")
+    print(now)
+    print("---------------------------------")
+    print("Press (A) To Send An Announcement")
+    print("Press (C) To Cancel")
+    print("---------------------------------")
+    print()
+    while True:
+        print()
+        to = input("To (Dean, Professor, Or Student): ").capitalize()
+        # CHECKING IF C WAS ENTERED
+        if len(to) == 1:
+            to = to.lower()
+        if to == "c":
+            ProfessorMenu(None)
+
+        # CHECKING IF A WAS ENTERED
+        if len(to) == 1:
+            to = to.lower()
+        if to == "a":
+            prof_send_announcement()
+
+        if to != '' and (to == "Student" or to == "Professor" or to == "Dean"):
+            break
+        if to == '' or (to != "Student" or to != "Professor" or to != "Dean"):
+            print("Messages Can Only Be Sent To: Dean, Professor Or Student")
+
+
+
+
+
+
+    # STUDENT
+    if to == "Student":
+        while True:
+            print()
+            stu_name = capitalize(input("Enter The Name Of The Student: "))
+            if stu_name != '':
+                break
+        sql = "SELECT id FROM Student WHERE name = %s"
+        val = (stu_name, )
+        db.execute(sql, val)
+        stu_id = db.fetchall()
+        if len(stu_id) == 0:
+            no_person_found("Notification", "Prof")
+        stu_id = stu_id[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Professor ({prof_name})", now, stu_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Professor Menu: ").lower()
+            if back == "s":
+                prof_send_notification()
+            elif back == "m":
+                ProfessorMenu(None)
+
+    # PROFESSOR
+    elif to == "Professor":
+        while True:
+            print()
+            professor_name = capitalize(input("Enter The Name Of The Professor: "))
+            if professor_name != '':
+                break
+        sql = "SELECT id FROM Professor WHERE name = %s"
+        val = (professor_name, )
+        db.execute(sql, val)
+        prof_id = db.fetchall()
+        if len(prof_id) == 0:
+            no_person_found("Notification", "Prof")
+        prof_id = prof_id[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Professor ({prof_name})", now, prof_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Professor Menu: ").lower()
+            if back == "s":
+                prof_send_notification()
+                break
+            elif back == "m":
+                ProfessorMenu(None)
+                break
+
+    # DEAN
+    elif to == "Dean":
+        while True:
+            print()
+            deanName = capitalize(input("Enter The Name Of The Dean: "))
+            if deanName != '':
+                break
+        # CHECKING IF CORRECT NAME WAS ENTERED
+        sql = "SELECT * FROM Dean WHERE name = %s"
+        val = (deanName,)
+        db.execute(sql, val)
+        result = db.fetchall()
+        if len(result) == 0:
+            no_person_found("Notification", "Prof")
+
+        # GETTING THE ID OF THE PROFESSOR
+        sql = "SELECT id FROM Professor WHERE name = %s"
+        val = (prof_name, )
+        db.execute(sql, val)
+        prof_id = db.fetchall()[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Professor ({prof_name})", now, prof_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Professor Menu: ").lower()
+            if back == "s":
+                prof_send_notification()
+                break
+            elif back == "m":
+                ProfessorMenu(None)
+                break
+
+# PROF SEND ANNOUNCEMENT
+def prof_send_announcement():
+    clear()
+    # GET THE COURSES BEING TAUGHT
+    sql = "SELECT CoursesTaught FROM Professor WHERE name = %s"
+    val = (prof_name, )
+    db.execute(sql, val)
+    courses_taught = db.fetchall()[0][0]
+    print("SEND ANNOUNCEMENT")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    print(f"Courses You Are Currently Teaching: {courses_taught.split()}")
+    while True:
+        print()
+        prof_choice = input("Enter The Name Of The Course You Want To Send An Announcement To: ").upper()
+        if prof_choice != '':
+            break
+    # CHECKING IF C WAS ENTERED
+    if len(prof_choice) == 1:
+        prof_choice = prof_choice.lower()
+    if prof_choice == "c":
+        ProfessorMenu(None)
+
+    # CHECK IF THE CORRECT COURSE WAS ENTERED
+    if prof_choice not in courses_taught.split():
+        while True:
+            print()
+            error = input("You Are Not Teaching That Course. Press (T) To Try Again:\n"
+                          "                                  Press (M) To Return To Professor Menu: ").lower()
+            if error == "t":
+                prof_send_announcement()
+            elif error == "m":
+                ProfessorMenu(None)
+
+
+    # THE ANNOUNCEMENT
+    while True:
+        print()
+        announcement = input("Enter the Announcement: ")
+        if announcement != '':
+            break
+
+    # CONFIRMATION
+    while True:
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Announcement? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+
+    if confirmation == "yes":
+        # GET THE STUDENTS ID
+        like_query = f"%{prof_choice}%"
+        sql = "SELECT id FROM Student WHERE CoursesEnrolledIn LIKE %s"
+        val = (like_query, )
+        db.execute(sql, val)
+        all_id = db.fetchall()
+
+        for i in range(len(all_id)):
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (announcement, f"Professor ({prof_name}) [{prof_choice}]", now, all_id[i][0])
+            db.execute(sql, val)
+            mydb.commit()
+
+
+        while True:
+            print()
+            back = input("Announcement Sent. Press (S) To Send Another:\n"
+                         "                   Press (M) To Return To Professor Menu: ").lower()
+            if back == "s":
+                prof_send_announcement()
+            elif back == "m":
+                ProfessorMenu(None)
+
+    elif confirmation == "no":
+        prof_send_announcement()
+
+
+
+
+
+
+# PROF INBOX
+def professor_inbox():
+    clear()
+    print("----------")
+    print("YOUR INBOX")
+    print("----------")
+    print(now)
+    print()
+    Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+
+    sql = "SELECT id, notification, received_from, date FROM professor_notification WHERE prof_id = %s"
+    val = (Prof.getID(),)
+    db.execute(sql, val)
+    all_notifications = db.fetchall()
+
+    if len(all_notifications) == 0:
+        print("No Notifications")
+
+
+    for i in range(len(all_notifications)):
+        print("-" * len(all_notifications[i][1]) + "---------")
+        print(f"Id: {all_notifications[i][0]}")
+        print(f"Date: {all_notifications[i][3]}")
+        print(f"Received From: {all_notifications[i][2]}")
+        print(f"Message: {all_notifications[i][1]}")
+        print("-" * len(all_notifications[i][1]) + "---------")
+        print()
+
+    while True:
+        print()
+        print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
+        print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
+        print("Press (M) To Filter By Message:           |  Press (S) To Return To Professor Menu:")
+        print()
+        filter = input("Choose An Option: ")
+        if filter == "d":
+            filter_prof_notification_by_date(all_notifications)
+        elif filter == "f":
+            filter_prof_notification_by_received_from(all_notifications)
+        elif filter == "m":
+            filter_prof_notification_by_message(all_notifications)
+        elif filter == "c":
+            clear_professor_notification()
+        elif filter == "ca":
+            clear_all_professor_notifications(Prof.getID())
+        elif filter == "s":
+            ProfessorMenu(None)
+
+# FILTER PROFESSOR NOTIFICATIONS
+def filter_prof_notification_by_date(notifications):
+    while True:
+        print()
+        date_to_filter = input("Enter The Date: ")
+        if date_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(date_to_filter) + "--------------")
+    print(f"Filtered by: {date_to_filter}")
+    print("-" * len(date_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if date_to_filter in notifications[i][3]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Professor Menu: ").lower()
+        if back == "f":
+            professor_inbox()
+        if back == "c":
+            clear_professor_notification()
+        elif back == "s":
+            ProfessorMenu(None)
+def filter_prof_notification_by_received_from(notifications):
+    while True:
+        print()
+        person_to_filter = input("Enter The Name: ")
+        person_to_filter = capitalize(person_to_filter)
+        if person_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(person_to_filter) + "--------------")
+    print(f"Filtered by: {person_to_filter}")
+    print("-" * len(person_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if person_to_filter in notifications[i][2]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Professor Menu: ").lower()
+        if back == "f":
+            professor_inbox()
+        elif back == "c":
+            clear_professor_notification()
+        elif back == "s":
+            ProfessorMenu(None)
+def filter_prof_notification_by_message(notifications):
+    while True:
+        print()
+        message_to_filter = input("Enter The Message: ")
+        if message_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(message_to_filter) + "--------------")
+    print(f"Filtered by: {message_to_filter}")
+    print("-" * len(message_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if message_to_filter in notifications[i][1]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Professor Menu: ").lower()
+        if back == "f":
+            professor_inbox()
+        elif back == "c":
+            clear_professor_notification()
+        elif back == "s":
+            ProfessorMenu(None)
+def clear_professor_notification():
+    while True:
+        print()
+        notification_id = input("Enter The Id Of The Notification: ")
+        if notification_id != '' and notification_id.isdigit():
+            break
+
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Clear This Notifications? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        sql = "DELETE FROM professor_notification WHERE id = %s"
+        val = (int(notification_id), )
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Notification Deleted. Press (M) To Return To Professor Menu: ").lower()
+            if back == "m":
+                ProfessorMenu(None)
+    else:
+        ProfessorMenu(None)
+
+def clear_all_professor_notifications(prof_id):
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Clear All Notifications? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        sql = "DELETE FROM professor_notification WHERE prof_id = %s"
+        val = (prof_id, )
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("All Notifications Cleared. Press (M) To Return To Professor Menu: ").lower()
+            if back == "m":
+                ProfessorMenu(None)
+    else:
+        ProfessorMenu(None)
 
 
 # STUDENT MENU
 def StudentMenu(name):
     clear()
-    clear()
     print("STUDENT MENU")
     if name != None:
         print(f"Welcome {name}")
+
+    # GET THE AMOUNT OF MESSAGES IN INBOX
+    Stu = Student(stu_name.split()[0], stu_name.split()[1], None, None, None, None, None, None)
+    sql = "SELECT COUNT(*) FROM student_notification WHERE stu_id = %s"
+    val = (Stu.getID(), )
+    db.execute(sql, val)
+    inbox_count = db.fetchall()[0][0]
     print(now)
-    print("--------------------")
+    print("------------------------------")
     print("Press (L) To Log Out")
-    print("--------------------")
+    print("Press (S) To Send Notification")
+    print("Press (A) To Open Inbox")
+    print("------------------------------")
     print()
-    print(f"INBOX: 0")
+    print(f"INBOX: {inbox_count}")
     print()
     print("AVAILABLE OPTIONS")
     print()
@@ -2470,6 +3553,10 @@ def StudentMenu(name):
 
     if stu_choice == "l":
         login()
+    elif stu_choice == "s":
+        stu_send_notification()
+    elif stu_choice == "a":
+        student_inbox()
     elif stu_choice == "1":
         view_student_profile()
     elif stu_choice == "2":
@@ -2567,6 +3654,221 @@ def change_student_password(stu_name, stu_id):
         if back == "b":
             StudentMenu(stu_name)
 
+# STUDENT INBOX
+def student_inbox():
+    clear()
+    print("----------")
+    print("YOUR INBOX")
+    print("----------")
+    print(now)
+    print()
+    Stu = Student(stu_name.split()[0], stu_name.split()[1], None, None, None, None, None, None)
+
+    sql = "SELECT id, notification, received_from, date FROM student_notification WHERE stu_id = %s"
+    val = (Stu.getID(), )
+    db.execute(sql, val)
+    all_notifications = db.fetchall()
+
+    if len(all_notifications) == 0:
+        print("No Notifications")
+
+
+    for i in range(len(all_notifications)):
+        # AUTO FIT THE BROKEN LINES
+        max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2])])
+        if max_len_of_attributes == len(all_notifications[i][1]):
+            broken_line_added = "-" * len("Message: ")
+        else:
+            broken_line_added = "-" * len("Received From: ")
+
+        print("-" * max_len_of_attributes + broken_line_added)
+        print(f"Id: {all_notifications[i][0]}")
+        print(f"Date: {all_notifications[i][3]}")
+        print(f"Received From: {all_notifications[i][2]}")
+        print(f"Message: {all_notifications[i][1]}")
+        print("-" * max_len_of_attributes + broken_line_added)
+        print()
+
+    while True:
+        print()
+        print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
+        print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
+        print("Press (M) To Filter By Message:           |  Press (S) To Return To Student Menu:")
+        print()
+        filter = input("Choose An Option: ")
+        if filter == "d":
+            filter_stu_notification_by_date(all_notifications)
+        elif filter == "f":
+            filter_stu_notification_by_received_from(all_notifications)
+        elif filter == "m":
+            filter_stu_notification_by_message(all_notifications)
+        elif filter == "c":
+            clear_student_notification()
+        elif filter == "ca":
+            clear_all_student_notifications(Stu.getID())
+        elif filter == "s":
+            StudentMenu(None)
+
+# FILTER STUDENT NOTIFICATIONS
+def filter_stu_notification_by_date(notifications):
+    while True:
+        print()
+        date_to_filter = input("Enter The Date: ")
+        if date_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(date_to_filter) + "--------------")
+    print(f"Filtered by: {date_to_filter}")
+    print("-" * len(date_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if date_to_filter in notifications[i][3]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Student Menu: ").lower()
+        if back == "f":
+            student_inbox()
+        if back == "c":
+            clear_student_notification()
+        elif back == "s":
+            StudentMenu(None)
+def filter_stu_notification_by_received_from(notifications):
+    while True:
+        print()
+        person_to_filter = input("Enter The Name: ")
+        person_to_filter = capitalize(person_to_filter)
+        if person_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(person_to_filter) + "--------------")
+    print(f"Filtered by: {person_to_filter}")
+    print("-" * len(person_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if person_to_filter in notifications[i][2]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Student Menu: ").lower()
+        if back == "f":
+            student_inbox()
+        elif back == "c":
+            clear_student_notification()
+        elif back == "s":
+            StudentMenu(None)
+def filter_stu_notification_by_message(notifications):
+    while True:
+        print()
+        message_to_filter = input("Enter The Message: ")
+        if message_to_filter != '':
+            break
+
+    clear()
+    total_found = 0
+    print("-" * len(message_to_filter) + "--------------")
+    print(f"Filtered by: {message_to_filter}")
+    print("-" * len(message_to_filter) + "--------------")
+    print()
+    for i in range(len(notifications)):
+        if message_to_filter in notifications[i][1]:
+            print("-" * len(notifications[i][1]) + "---------")
+            print(f"Id: {notifications[i][0]}")
+            print(f"Date: {notifications[i][3]}")
+            print(f"Received From: {notifications[i][2]}")
+            print(f"Message: {notifications[i][1]}")
+            print("-" * len(notifications[i][1]) + "---------")
+            print()
+            total_found += 1
+
+    if total_found == 0:
+        print()
+        print("No Notifications Found")
+
+    while True:
+        print()
+        back = input("Press (F) To Filter Again:\nPress (C) To Clear A Notification:\nPress (S) To Return To Student Menu: ").lower()
+        if back == "f":
+            student_inbox()
+        elif back == "c":
+            clear_student_notification()
+        elif back == "s":
+            StudentMenu(None)
+def clear_student_notification():
+    while True:
+        print()
+        notification_id = input("Enter The Id Of The Notification: ")
+        if notification_id != '' and notification_id.isdigit():
+            break
+
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Clear This Notifications? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        sql = "DELETE FROM student_notification WHERE id = %s"
+        val = (int(notification_id), )
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Notification Deleted. Press (M) To Return To Student Menu: ").lower()
+            if back == "m":
+                StudentMenu(None)
+    else:
+        StudentMenu(None)
+
+def clear_all_student_notifications(stu_id):
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Clear All Notifications? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+
+    if confirmation == "yes":
+        sql = "DELETE FROM student_notification WHERE stu_id = %s"
+        val = (stu_id, )
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("All Notifications Cleared. Press (M) To Return To Student Menu: ").lower()
+            if back == "m":
+                StudentMenu(None)
+    else:
+        StudentMenu(None)
 
 # REQUEST MAJOR CHANGE
 def request_major_change(student_id, student_name, current_major):
@@ -2634,7 +3936,7 @@ def request_major_change(student_id, student_name, current_major):
     if confirmation == "yes":
         # SET UP NOTIFICATION
         notification = f"Requesting Major Change From {current_major} To {new_major} Because: {reason}"
-        received_from = "Student"
+        received_from = f"Student ({student_name})"
         date = now
         stu_id = student_id
 
@@ -2653,6 +3955,143 @@ def request_major_change(student_id, student_name, current_major):
         StudentMenu(student_name)
 
 
+# STU SEND NOTIFICATION
+def stu_send_notification():
+    clear()
+    print("SEND NOTIFICATION")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    while True:
+        print()
+        to = input("To (Dean, Professor, Or Student): ").capitalize()
+        if to != '' and (to == "Student" or to == "Professor" or to == "Dean"):
+            break
+        if to == '' or (to != "Student" or to != "Professor" or to != "Dean"):
+            print("Messages Can Only Be Sent To: Dean, Professor Or Student")
+
+    # CHECKING IF C WAS ENTERED
+    if len(to) == 1:
+        to = to.lower()
+    if to == "c":
+        ProfessorMenu(None)
+
+    # STUDENT
+    if to == "Student":
+        while True:
+            print()
+            student_name = capitalize(input("Enter The Name Of The Student: "))
+            if student_name != '':
+                break
+        sql = "SELECT id FROM Student WHERE name = %s"
+        val = (student_name, )
+        db.execute(sql, val)
+        stu_id = db.fetchall()
+        if len(stu_id) == 0:
+            no_person_found("Notification", "Stu")
+        stu_id = stu_id[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Student ({stu_name})", now, stu_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Student Menu: ").lower()
+            if back == "s":
+                stu_send_notification()
+            elif back == "m":
+                StudentMenu(None)
+
+    # PROFESSOR
+    elif to == "Professor":
+        while True:
+            print()
+            professor_name = capitalize(input("Enter The Name Of The Professor: "))
+            if professor_name != '':
+                break
+        sql = "SELECT id FROM Professor WHERE name = %s"
+        val = (professor_name, )
+        db.execute(sql, val)
+        prof_id = db.fetchall()
+        if len(prof_id) == 0:
+            no_person_found("Notification", "Stu")
+        prof_id = prof_id[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Professor ({prof_name})", now, prof_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Student Menu: ").lower()
+            if back == "s":
+                stu_send_notification()
+                break
+            elif back == "m":
+                StudentMenu(None)
+                break
+
+    # DEAN
+    elif to == "Dean":
+        while True:
+            print()
+            deanName = capitalize(input("Enter The Name Of The Dean: "))
+            if deanName != '':
+                break
+        # CHECKING IF CORRECT NAME WAS ENTERED
+        sql = "SELECT * FROM Dean WHERE name = %s"
+        val = (deanName,)
+        db.execute(sql, val)
+        result = db.fetchall()
+        if len(result) == 0:
+            no_person_found("Notification", "Stu")
+
+        # GETTING THE ID OF THE STUDENT
+        sql = "SELECT id FROM Student WHERE name = %s"
+        val = (stu_name, )
+        db.execute(sql, val)
+        stu_id = db.fetchall()[0][0]
+
+        while True:
+            message = input("Message: ")
+            if message != '':
+                break
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"Student ({stu_name})", now, stu_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                         "                            Press (M) To Return To Student Menu: ").lower()
+            if back == "s":
+                stu_send_notification()
+                break
+            elif back == "m":
+                StudentMenu(None)
+                break
 
 
 
@@ -2686,7 +4125,6 @@ def view_all_courses_stu():
         elif stu_choice == "m":
             StudentMenu(None)
 
-
 # SEARCH FOR COURSE
 def search_for_course_stu(came_from=None):
     if came_from != None:
@@ -2706,8 +4144,6 @@ def search_for_course_stu(came_from=None):
 
     # COURSE WAS FOUND
     select_course_stu(course_name)
-
-
 
 # SELECT COURSE
 def select_course_stu(course_name):
@@ -2740,10 +4176,15 @@ def select_course_stu(course_name):
         elif back == "e":
             enroll_in_course(course_name)
         elif back == "d":
-            pass
+            sql = "SELECT CoursesEnrolledIn FROM Student WHERE name = %s"
+            val = (stu_name, )
+            db.execute(sql, val)
+            courses_enrolled_in = db.fetchall()[0][0]
+
+            Stu = Student(stu_name.split()[0], stu_name.split()[1], None, None, None, courses_enrolled_in, None, None)
+            drop_class(Stu.getID(), Stu.getCoursesEnrolledIn(), course_name)
         elif back == "m":
             StudentMenu(None)
-
 
 # ENROLL IN COURSE
 def enroll_in_course(course_name):
@@ -2792,9 +4233,17 @@ def enroll_in_course(course_name):
         if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
             break
     if confirmation == "yes":
+        Stu = Student(stu_name.split()[0], stu_name.split()[1], None, None, None, None, None, None)
+
         new_courses_to_add = courses_enrolled_in + " " + course_name
-        sql = "UPDATE Student SET CoursesEnrolledIn = %s WHERE name = %s"
-        val = (new_courses_to_add, stu_name)
+        sql = "UPDATE Student SET CoursesEnrolledIn = %s WHERE id = %s"
+        val = (new_courses_to_add, Stu.getID())
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (f"{stu_name} Enrolled In: {course_name}", "Student", now, Stu.getID())
         db.execute(sql, val)
         mydb.commit()
 
@@ -2812,7 +4261,7 @@ def enroll_in_course(course_name):
 
 
 # DROP STUDENT FROM COURSE
-def drop_class(student_id, courses_enrolled_in):
+def drop_class(student_id, courses_enrolled_in, name_of_class=None):
     clear()
     print("DROP CLASS")
     print(now)
@@ -2822,10 +4271,14 @@ def drop_class(student_id, courses_enrolled_in):
     print()
     print(f"CURRENT COURSES ENROLLED IN: {courses_enrolled_in}")
     print()
-    while True:
-        class_to_drop = input("Enter The Name Of Class To Drop: ").upper()
-        if class_to_drop != '':
-            break
+    if name_of_class == None:
+        while True:
+            class_to_drop = input("Enter The Name Of Class To Drop: ").upper()
+            if class_to_drop != '':
+                break
+    else:
+        class_to_drop = name_of_class
+
     # CHECKING IF C WAS ENTERED
     if len(class_to_drop) == 1:
         class_to_drop = class_to_drop.lower()
@@ -2856,12 +4309,17 @@ def drop_class(student_id, courses_enrolled_in):
             if course != class_to_drop:
                 new_courses += course
                 new_courses += " "
-
         new_courses = new_courses.rstrip()
 
         # UPDATE THEIR COURSES ENROLLED IN
         sql = "UPDATE Student SET CoursesEnrolledIn = %s WHERE id = %s"
         val = (new_courses, student_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (f"{stu_name} Dropped: {class_to_drop}", "Student", now, student_id)
         db.execute(sql, val)
         mydb.commit()
 
@@ -2883,7 +4341,6 @@ def sanitize_password(password, name, came_from=None):
         msg = "Your"
     else:
         msg = "Their"
-    # TODO - Check Password Strength By The Amount Of Characters Or If It Is Similar To Name
     if " " in password:
         while True:
             while True:
