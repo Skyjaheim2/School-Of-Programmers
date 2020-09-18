@@ -1,11 +1,17 @@
 import mysql.connector
+import os
+
+db_user = os.environ.get("DB_USER")
+db_password = os.environ.get('DB_PASSWORD')
+
+mydb = mysql.connector.connect(host="localhost", user=db_user, passwd=db_password, database="student")
+
+db = mydb.cursor()
 
 from Person import Person
 from Course import Course
 
-mydb = mysql.connector.connect(host="localhost", user="root", passwd="jaheimSQL18", database="student")
 
-db = mydb.cursor()
 
 class Professor(Person):
     MAX_COURSES_A_PROFESSOR_CAN_TEACH = 5

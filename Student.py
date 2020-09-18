@@ -1,9 +1,12 @@
 from Person import Person
 from Course import Course
 import mysql.connector
+import os
 
+db_user = os.environ.get("DB_USER")
+db_password = os.environ.get('DB_PASSWORD')
 
-mydb = mysql.connector.connect(host="localhost", user="root", passwd="jaheimSQL18", database="student")
+mydb = mysql.connector.connect(host="localhost", user=db_user, passwd=db_password, database="student")
 
 db = mydb.cursor()
 
@@ -47,7 +50,21 @@ class Student(Person):
     def getGrades(self):
         if self.__grades == None:
             return None
-        return self.__grades
+
+        grades = self.__grades.split()
+
+        grades_to_return = ""
+        for grade in grades:
+            if grade.isdigit():
+                grades_to_return += grade + "%"
+            if not grade.isdigit():
+                grades_to_return += grade
+            grades_to_return += " "
+
+        grades_to_return = grades_to_return.rstrip()
+        return grades_to_return
+
+
         # current_courses = self.getCoursesEnrolledIn().split()
         # grades = self.getGradesForAverage()
         # if grades == None or current_courses == None:

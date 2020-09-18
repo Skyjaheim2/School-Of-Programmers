@@ -1,9 +1,12 @@
 import mysql.connector
+import os
 
-mydb = mysql.connector.connect(host="localhost", user="root", passwd="jaheimSQL18", database="student")
+db_user = os.environ.get("DB_USER")
+db_password = os.environ.get('DB_PASSWORD')
+
+mydb = mysql.connector.connect(host="localhost", user=db_user, passwd=db_password, database="student")
 
 db = mydb.cursor()
-
 
 class Course:
     MIN_STUDENTS = 15

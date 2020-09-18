@@ -14,6 +14,7 @@ now = current_date.strftime("%B %d, %Y")
 # CLASSES
 from Professor import Professor
 from Course import Course
+from Major import Major
 from Person import Person
 from Student import Student
 
@@ -557,11 +558,12 @@ def DeanMenu(name):
     if name != None:
         print(f"Welcome {name}")
     print(now)
-    print("------------------------------")
+    print("-------------------------------")
     print("Press (L) To Log Out")
     print("Press (S) To Send Notification")
-    print("Press (A) To Open Inbox")
-    print("------------------------------")
+    print("Press (A) To Open Admin Options")
+    print("Press (I) To Open Inbox")
+    print("-------------------------------")
     print()
     print(f"INBOX: {inbox_count}")
     print()
@@ -582,8 +584,10 @@ def DeanMenu(name):
             user_choice = user_choice.lower()
         if user_choice == "l":
             login()
-        elif user_choice == "a":
+        elif user_choice == "i":
             dean_inbox()
+        elif user_choice == "a":
+            dean_admin_options()
         elif user_choice == "s":
             dean_send_notification()
         elif  user_choice == "1":
@@ -659,59 +663,77 @@ def view_all_majors(came_from=None):
         print("-------------------------------------------")
         back = input("Press (D) To Get The Description Of A Major:\n"
                      "Press (B) To Go Back: ").lower()
-        if back == "d":
-            while True:
-                print()
-                major_name = input("Enter The Name Of The Major: ")
-                if major_name != '':
-                    break
-            major_name = capitalize(major_name)
-            # CHECKING VALID MAJOR NAME WAS ENTERED
-            if not Student.checkIfMajorIsAvailableToSet(major_name):
-                while True:
-                    print()
-                    if came_from == "Dean":
-                        error = input("Invalid Major. Press (T) To Try Again:\nPress (M) To Return To Dean Menu: ").lower()
-                        if error == "t":
-                            view_all_majors("Dean")
-                        elif error == "m":
-                            DeanMenu(None)
-                    elif came_from == "Student":
-                        print()
-                        error = input(
-                            "Invalid Major. Press (T) To Try Again:\nPress (M) To Return To Student Menu: ").lower()
-                        if error == "t":
-                            view_all_majors("Student")
-                        elif error == "m":
-                            StudentMenu(None)
-
-            # GETTING THE DESCRIPTION OF THE MAJOR
-            sql = "SELECT description FROM Major WHERE name = %s"
-            val = (major_name, )
-            db.execute(sql, val)
-            major_description = db.fetchall()[0][0]
-
-            clear()
-            print("-" * len(major_name))
-            print(major_name.upper())
-            print("-" * len(major_name))
+        if back != '' and (back == "d" or back == "b"):
+            break
+    if back == "d":
+        while True:
             print()
-            print(major_description)
-
+            major_name = input("Enter The Name Of The Major: ")
+            if major_name != '':
+                break
+        major_name = capitalize(major_name)
+        # CHECKING VALID MAJOR NAME WAS ENTERED
+        if not Student.checkIfMajorIsAvailableToSet(major_name):
             while True:
                 print()
                 if came_from == "Dean":
-                    back = input("Press (C) To View More Majors:\nPress (M) To Return To Dean Menu: ").lower()
-                    if back == "c":
+                    error = input("Invalid Major. Press (T) To Try Again:\nPress (M) To Return To Dean Menu: ").lower()
+                    if error == "t":
                         view_all_majors("Dean")
-                    elif back == "m":
+                        break
+                    elif error == "m":
                         DeanMenu(None)
+                        break
                 elif came_from == "Student":
-                    back = input("Press (C) To View More Majors:\nPress (M) To Return To Student Menu: ").lower()
-                    if back == "c":
+                    print()
+                    error = input(
+                        "Invalid Major. Press (T) To Try Again:\nPress (M) To Return To Student Menu: ").lower()
+                    if error == "t":
                         view_all_majors("Student")
-                    elif back == "m":
+                        break
+                    elif error == "m":
                         StudentMenu(None)
+                        break
+
+        # GETTING THE DESCRIPTION OF THE MAJOR
+        sql = "SELECT description FROM Major WHERE name = %s"
+        val = (major_name, )
+        db.execute(sql, val)
+        major_description = db.fetchall()[0][0]
+
+        clear()
+        print("-" * len(major_name))
+        print(major_name.upper())
+        print("-" * len(major_name))
+        print()
+        print(major_description)
+        major = Major(major_name)
+        print()
+        major.getRequiredCourse("GET")
+
+        while True:
+            print()
+            if came_from == "Dean":
+                back = input("Press (C) To View More Majors:\nPress (M) To Modify Major:\nPress (A) To Admin Options: ").lower()
+                if back == "c":
+                    view_all_majors("Dean")
+                elif back == "m":
+                    dean_modify_major(major_name, major.getRequiredCourse("POST"))
+                elif back == "a":
+                    dean_admin_options()
+            elif came_from == "Student":
+                back = input("Press (C) To View More Majors:\nPress (M) To Return To Student Menu: ").lower()
+                if back == "c":
+                    view_all_majors("Student")
+                elif back == "m":
+                    StudentMenu(None)
+    elif back == "b":
+        if came_from == "Dean":
+            dean_admin_options()
+        elif came_from == "Student":
+            StudentMenu(None)
+        elif came_from == "Prof":
+            ProfessorMenu(None)
 
 
 # TAKE ACTION ON STUDENT
@@ -1220,6 +1242,18 @@ def no_person_found(came_from=None, argv=None):
                 elif argv == "Stu":
                     StudentMenu(None)
 
+    elif came_from == "Enroll_Student_In_Course":
+        while True:
+            print()
+            tmp = input("That Student Was Not Found. Press (T) To Try Again:\n"
+                        "                            Press (M) To Return To Dean Menu: ").lower()
+            if tmp == "t":
+                enroll_student_in_course(argv)
+            elif tmp == "m":
+                DeanMenu(None)
+
+
+
 # DEAN VIEW ALL COURSES
 def view_all_courses_dean():
     clear()
@@ -1267,23 +1301,52 @@ def select_course_dean(course_name):
     print("-" * len(course) + "------------------")
     print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
     print(f"Class Size: {course.getStudentCountInCourse()}")
+    if course.getStudentCountInCourse() > 0:
+        # COMPUTE THE CLASS AVERAGE
+        all_grades = []
+        all_names = course.getStudentNamesInCourse().split()
+        for i in range(course.getStudentCountInCourse()):
+            # GETTING STUDENTS INFO
+            sql = "SELECT CoursesEnrolledIn, grades FROM Student WHERE name = %s"
+            val = (all_names[i + i] + " " + all_names[i + i + 1],)
+            db.execute(sql, val)
+            result = db.fetchall()
+
+            grades_for_course = {}
+            grades_from_db = result[0][1].split()
+
+            for grade in grades_from_db:
+                # GENERATE DICTIONARY OF GRADES
+                if ':' in grade:
+                    grade_key = grade.replace(':', '')
+                if grade.replace("%", '').isnumeric():
+                    grade_value = grade.replace('%', '')
+
+                    grades_for_course.update({grade_key: grade_value})
+
+            all_grades.append(int(grades_for_course[course_name]))
+        # COMPUTING THE AVERAGE GRADE FOR THE COURSE
+        average = round(sum(all_grades) / len(all_grades))
+        print(f"Class Average: {average}%")
     print("-" * len(course) + "------------------")
     print()
 
     while True:
         print("Press (S) To Search Again:")
         print("Press (E) To Enroll A Student In This Course:")
-        back = input("Press (M) To Return To Student Menu: ").lower()
+        if course.getStudentCountInCourse() != 0:
+            print("Press (V) To View All Students Enrolled In This Course: ")
+        back = input("Press (A) To Return To Admin Options: ").lower()
         if back == "s":
             search_for_course_dean("Search")
         elif back == "e":
             enroll_student_in_course(course_name)
-        elif back == "m":
-            DeanMenu(None)
+        elif course.getStudentCountInCourse() != 0 and back == "v":
+            view_students_enrolled_in_course_dean(course_name)
+        elif back == "a":
+            dean_admin_options()
 # SEARCH FOR COURSE DEAN
 def search_for_course_dean(came_from=None):
-    if came_from != None:
-        clear()
     while True:
         print()
         course_name = input("Enter The Name Of The Course: ").upper()
@@ -1295,7 +1358,7 @@ def search_for_course_dean(came_from=None):
     db.execute(sql, val)
     result = db.fetchall()
     if len(result) == 0:
-        course_not_found()
+        course_not_found("Dean Search For Course")
 
     # COURSE WAS FOUND
     select_course_dean(course_name)
@@ -1324,7 +1387,11 @@ def enroll_student_in_course(course_name):
     sql = "SELECT CoursesEnrolledIn From Student WHERE name = %s"
     val = (stu_name,)
     db.execute(sql, val)
-    courses_enrolled_in = db.fetchall()[0][0]
+    # CHECKING IF THAT STUDENT WAS FOUND
+    courses_enrolled_in = db.fetchall()
+    if len(courses_enrolled_in) == 0:
+        no_person_found("Enroll_Student_In_Course", course_name)
+    courses_enrolled_in = courses_enrolled_in[0][0]
     print()
     print(f"Courses {stu_name} Is Currently Enrolled In: {courses_enrolled_in.split()}")
 
@@ -1375,7 +1442,7 @@ def enroll_student_in_course(course_name):
         dean_id = db.fetchall()[0][0]
 
         sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
-        val = (f"{stu_name} Has Been Enrolled In: {course_name}", "Dean", now, dean_id)
+        val = (f"{stu_name} Has Been Enrolled In: {course_name}", f"Dean ({dean_name})", now, dean_id)
         db.execute(sql, val)
         mydb.commit()
 
@@ -1390,7 +1457,33 @@ def enroll_student_in_course(course_name):
                 DeanMenu(None)
     else:
         DeanMenu(None)
+def view_students_enrolled_in_course_dean(course_name):
+    clear()
+    print("---------------------" + "-" * len(course_name))
+    print(f"STUDENTS ENROLLED IN {course_name}")
+    print("---------------------" + "-" * len(course_name))
+    print()
+    course = Course(course_name)
+    # GET ALL STUDENTS IN COURSE
+    sql = "SELECT studentsInCourse FROM Course WHERE name = %s"
+    val = (course_name,)
+    db.execute(sql, val)
+    result = db.fetchall()[0][0].split()
+    students_in_course = [result[i] + " " + result[i + 1] for i in range(len(result) // 2)]
 
+    print(students_in_course)
+
+    while True:
+        print()
+        tmp = input("Press (V) To View Students Grades:\nPress (A) To Return To Admin Options: ").lower()
+        if tmp == "v":
+            all_names = course.getStudentNamesInCourse().split()
+            num_students_in_course = course.getStudentCountInCourse()
+            view_student_grade_for_course(all_names, num_students_in_course, course_name, "Dean")
+            break
+        elif tmp == "a":
+            dean_admin_options()
+            break
 
 
 # REGISTER STUDENT
@@ -1592,12 +1685,18 @@ def dean_inbox():
 
 
     for i in range(len(all_notifications)):
-        print("-" * len(all_notifications[i][1]) + "---------")
+        if len(all_notifications[i][1]) <= 188:
+            print("-" * len(all_notifications[i][1]) + "---------")
+        else:
+            print("-" * 109 + "---------\n")
         print(f"Id: {all_notifications[i][0]}")
         print(f"Date: {all_notifications[i][3]}")
         print(f"Received From: {all_notifications[i][2]} Id: {all_notifications[i][4]}")
         print(f"Message: {all_notifications[i][1]}")
-        print("-" * len(all_notifications[i][1]) + "---------")
+        if len(all_notifications[i][1]) <= 188:
+            print("-" * len(all_notifications[i][1]) + "---------")
+        else:
+            print("-" * 109 + "---------")
         print()
 
     while True:
@@ -2544,6 +2643,618 @@ def unregister_professor():
         else:
             DeanMenu(None)
 
+# DEAN ADMIN OPTIONS
+def dean_admin_options():
+    clear()
+    print("DEAN ADMIN OPTIONS")
+    print(now)
+    print("--------------------------------")
+    print("Press (M) To Return To Dean Menu")
+    print("--------------------------------")
+    print()
+    print("Available Options")
+    print()
+    print("1 - View All Courses           | 6  - Add New Major")
+    print("2 - Add New Course             | 7  - Remove Major")
+    print("3 - Edit Course                | 8  - Delete All Professor Data")
+    print("4 - Remove Course              | 9  - Delete All Student Data")
+    print("5 - View All Majors            | 10 - Delete All Data")
+    print()
+    while True:
+        print()
+        dean_choice = input("Choose An Option: ").lower()
+        if dean_choice != '':
+            break
+    if dean_choice == "m":
+        DeanMenu(None)
+    if dean_choice == "1":
+        view_all_courses_dean()
+    elif dean_choice == "2":
+        add_new_course()
+    elif dean_choice == "3":
+        edit_course()
+    elif dean_choice == "4":
+        remove_course()
+    elif dean_choice == "5":
+        view_all_majors("Dean")
+    elif dean_choice == "6":
+        delete_all_prof_data()
+    elif dean_choice == "7":
+        delete_all_stu_data()
+    elif dean_choice == "8":
+        delete_all_data()
+    else:
+        dean_admin_options()
+
+# DEAN ADD NEW COURSE
+def add_new_course():
+    clear()
+    print("ADD NEW COURSE")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    while True:
+        print()
+        view_course = input("Would You Like To View All Courses? ").lower()
+        # CHECKING IF C WAS ENTERED
+        if view_course == "c":
+            dean_admin_options()
+        if view_course != '' and (view_course == "yes" or view_course == "no"):
+            break
+    if view_course == "yes":
+        view_all_courses_dean()
+    else:
+        # COURSE NAME SHORT
+        while True:
+            print()
+            new_course_number = input("Enter The Course Number Eg. MATH-05: ").upper()
+            # CHECKING IF C WAS ENTERED
+            if len(new_course_number) == 1:
+                new_course_number = new_course_number.lower()
+            if new_course_number == "c":
+                dean_admin_options()
+            if new_course_number != '':
+                break
+        new_course_number = check_course_num_format(new_course_number)
+
+        # COURSE NAME LONG
+        while True:
+            print()
+            new_course_long_name = input("Enter The Full Name Of The Course: ").upper()
+            # CHECKING IF C WAS ENTERED
+            if len(new_course_long_name) == 1:
+                new_course_long_name = new_course_long_name.lower()
+            if new_course_long_name == "c":
+                dean_admin_options()
+            if new_course_long_name != '':
+                break
+        new_course_long_name += ":"
+        # COURSE DESCRIPTION
+        while True:
+            print()
+            new_course_description = input("Enter The Description Of The Course: ")
+            # CHECKING IF C WAS ENTERED
+            if len(new_course_description) == 1:
+                new_course_description = new_course_description.lower()
+            if new_course_description == "c":
+                dean_admin_options()
+            if new_course_description != '':
+                break
+
+        # ADD THE COURSE TO THE DATABASE
+        full_description = new_course_long_name + " " + new_course_description
+        sql = "INSERT INTO Course (name, description) VALUES (%s, %s)"
+        val = (new_course_number, full_description)
+        db.execute(sql, val)
+        mydb.commit()
+
+        update_course_database()
+
+        # SET UP NOTIFICATION
+        notification = f"{new_course_number} Has Been Added - {new_course_long_name} {full_description}"
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name, )
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+
+        print()
+        print(f"{new_course_number} Has Been Added")
+        print("-" * len(new_course_number) + "---------------")
+        print()
+        print("Application Needs To Be Restarted To View New Course")
+        print()
+        print(f"{full_description}")
+        while True:
+            print()
+            back = input("Press (A) To Add Another Course:\nPress (M) To Return To Admin Options: ").lower()
+            if back == "a":
+                add_new_course()
+                break
+            elif back == "m":
+                dean_admin_options()
+                break
+def check_course_num_format(course_number):
+    course_number = course_number.replace(" ", "")
+    if "-" not in course_number:
+        while True:
+            print()
+            error = input("Invalid Course Number. Press (T) To Try Again:\n"
+                          "                       Press (M) To Return To Dean Menu: ").lower()
+            if error != '' and (error == "t" or error == "m"):
+                break
+
+        if error == "t":
+            print()
+            new_course_num = input("Enter The Course Number Eg. MATH-05: ").upper()
+            new_course_num = check_course_num_format(new_course_num)
+
+        elif error == "m":
+            DeanMenu(None)
+
+        return new_course_num
+    return course_number
+# DEAN EDIT COURSE
+def edit_course(courseName=None, courseDescriptionOrName=None):
+    clear()
+    print("EDIT COURSE")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    if courseName == None:
+        while True:
+            print()
+            course_name = input("Enter The Name Of The Course: ").upper()
+            if course_name != '':
+                break
+    else:
+        course_name = courseName
+    # CHECK IF C WAS ENTERED
+    if len(course_name) == 1:
+        course_name = course_name.lower()
+    if course_name == "c":
+        dean_admin_options()
+
+    # CHECKING IF THE COURSE ENTERED IS AVAILABLE
+    if not checkCourse(course_name):
+        course_not_found("Edit_Course")
+
+    print()
+    sql = "SELECT description FROM Course WHERE name = %s"
+    val = (course_name, )
+    db.execute(sql, val)
+    course_description = db.fetchall()[0][0]
+    print()
+    clear()
+    print(f"{course_name}")
+    print("-" * len(course_name))
+    print()
+    print(course_description)
+    print()
+    # CHANGES
+    if courseDescriptionOrName == None:
+        while True:
+            print()
+            edit_to_make = input("Would You Like To Edit The Name Of The Course Or The Description? ").lower()
+            if edit_to_make != '' and (edit_to_make == "name" or edit_to_make == "description"):
+                break
+    else:
+        edit_to_make = courseDescriptionOrName
+
+    if edit_to_make == "name":
+        while True:
+            print()
+            new_course_name = input("Enter The New Name Of The Course: ").upper()
+            if new_course_name != '':
+                break
+
+
+        # CONFIRMATION
+        while True:
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Edit The Name Of This Course? ").lower()
+            if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+                break
+        if confirmation == "yes":
+            sql = "UPDATE Course SET name = %s WHERE name = %s"
+            val = (new_course_name, course_name)
+            db.execute(sql, val)
+            mydb.commit()
+
+            # SET UP NOTIFICATION
+            notification = f"{course_name} Name Has Been Changed To - {new_course_name}"
+            received_from = f"Dean ({dean_name})"
+            sql = "SELECT id FROM Dean WHERE name = %s"
+            val = (dean_name,)
+            db.execute(sql, val)
+            dean_id = db.fetchall()[0][0]
+
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (notification, received_from, now, dean_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Course Name Has Been Changed. Press (E) To Edit More Courses:\n"
+                             "                              Press (A) To Return To Admin Options: ").lower()
+                if back == "e":
+                    edit_course()
+                    break
+                elif back == "a":
+                    dean_admin_options()
+                    break
+
+        elif confirmation == "no":
+            dean_admin_options()
+
+    elif edit_to_make == "description":
+        while True:
+            print()
+            new_course_description = input("Enter The New Description Of The Course: ")
+            if new_course_description != '':
+                break
+
+        # CHECKING COURSE FORMAT
+        if course_description[:indexOf(course_description, ':')] != new_course_description[:indexOf(new_course_description, ':')]:
+            print()
+            print(f"You Need To Add {course_description[:indexOf(course_description, ':')]}: At The Beginning Of The "
+                  f"Description")
+            while True:
+                print()
+                error = input("Press (T) To Try Again:\nPress (A) To Return To Admin Options: ").lower()
+                if error == "t":
+                    edit_course(course_name, edit_to_make)
+                    break
+                elif error == "a":
+                    dean_admin_options()
+                    break
+
+        # CONFIRMATION
+        while True:
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Edit The Description Of This Course? ").lower()
+            if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+                break
+
+        if confirmation == "yes":
+            # SET UP NOTIFICATION
+            notification = f"{course_name} Description Has Been Changed To - {new_course_description}"
+            received_from = f"Dean ({dean_name})"
+            sql = "SELECT id FROM Dean WHERE name = %s"
+            val = (dean_name,)
+            db.execute(sql, val)
+            dean_id = db.fetchall()[0][0]
+
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (notification, received_from, now, dean_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            sql = "UPDATE Course SET description = %s WHERE name = %s"
+            val = (new_course_description, course_name)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Course Description Has Been Changed. Press (E) To Edit More Courses:\n"
+                             "                                     Press (A) To Return To Admin Options: ").lower()
+                if back == "e":
+                    edit_course()
+                    break
+                elif back == "a":
+                    dean_admin_options()
+                    break
+        else:
+            dean_admin_options()
+
+# REMOVE COURSE
+def remove_course():
+    clear()
+    print("REMOVE COURSE")
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    while True:
+        print()
+        view_course = input("Would You Like To View All Courses? ").lower()
+        # CHECKING IF C WAS ENTERED
+        if view_course == "c":
+            dean_admin_options()
+        if view_course != '' and (view_course == "yes" or view_course == "no"):
+            break
+    if view_course == "yes":
+        view_all_courses_dean()
+    else:
+        while True:
+            print()
+            course_to_remove = input("Enter The Name Of The Course To Remove: ").upper()
+            if course_to_remove != '':
+                break
+        # CHECKING IF C WAS ENTERED
+        if len(course_to_remove) == 1:
+            course_to_remove = course_to_remove.lower()
+        if course_to_remove == "c":
+            dean_admin_options()
+
+        # CHECK IT COURSE ENTERED IS AVAIALBLED
+        if not checkCourse(course_to_remove):
+            course_not_found("Dean Remove Course")
+
+        # CONFIRMATION
+        while True:
+            confirmation = input(f"CONFIRMATION: Are You Sure You Want To Remove {course_to_remove}? ").lower()
+            if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+                break
+
+        if confirmation == "yes":
+            sql = "DELETE FROM Course WHERE name = %s"
+            val = (course_to_remove, )
+            db.execute(sql, val)
+            mydb.commit()
+
+            # SET UP NOTIFICATION
+            notification = f"{course_to_remove} Has Been Removed"
+            received_from = f"Dean ({dean_name})"
+            sql = "SELECT id FROM Dean WHERE name = %s"
+            val = (dean_name,)
+            db.execute(sql, val)
+            dean_id = db.fetchall()[0][0]
+
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (notification, received_from, now, dean_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Course Has Been Removed. Press (R) To Remove Another Course:\n"
+                             "                         Press (M) To Return To Dean Menu: ").lower()
+                if back == "r":
+                    remove_course()
+                    break
+                elif back == "m":
+                    DeanMenu(None)
+                    break
+        elif confirmation == "no":
+            DeanMenu(None)
+
+
+
+
+def dean_modify_major(major_name, major_details):
+    print()
+    print("-------" + "-" * len(major_name))
+    print(f"MODIFY {major_name.upper()}")
+    print("-------" + "-" * len(major_name))
+    print()
+    print("OPTIONS")
+    print()
+    print("1 -> Change Description")
+    print("2 -> Change Minimum Math Level")
+    print("3 -> Change Minimum English Level")
+    while True:
+        print()
+        dean_choice = input("Choose An Option: ")
+        if dean_choice == "1":
+            change_major_description(major_name, major_details)
+        elif dean_choice == "2":
+            change_minimum_math_level(major_name, major_details)
+        elif dean_choice == "3":
+            change_minimum_eng_level(major_name, major_details)
+
+# CHANGE MAJOR DESCRIPTION
+def change_major_description(major_name, major_details):
+    clear()
+    print("-------" + "-" * len(major_name) + "-----------")
+    print(f"CHANGE {major_name.upper()} DESCRIPTION")
+    print("-------" + "-" * len(major_name) + "-----------")
+    print()
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+
+
+    sql = "SELECT description FROM Major WHERE name = %s"
+    val = (major_name, )
+    db.execute(sql, val)
+    current_description = db.fetchall()[0][0]
+
+    print(f"Current Description: {current_description}")
+    while True:
+        print()
+        new_description = input("Enter New Description: ")
+        if new_description != '':
+            break
+    # CHECKING IF C WAS ENTERED
+    if len(new_description) == 1:
+        new_description = new_description.lower()
+    if new_description == "c":
+        view_all_majors("Dean")
+    while True:
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Change The Description? ")
+        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+            break
+    if confirmation == "yes":
+        sql = "UPDATE Major SET description = %s WHERE name = %s"
+        val = (new_description, major_name)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        notification = f"{major_name} Description Has Been Changed"
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name,)
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Description Updated: Press (V) To View More Majors:\n"
+                         "                     Press (A) To Return To Admin Options").lower()
+            if back == "v":
+                view_all_majors("Dean")
+            elif back == "a":
+                dean_admin_options()
+
+
+    elif confirmation == "no":
+        view_all_majors("Dean")
+
+# CHANGE MINIMUM MATH LEVEL
+def change_minimum_math_level(major_name, major_details):
+    clear()
+    print("-------" + "-" * len(major_name) + "-------")
+    print(f"CHANGE {major_name.upper()} DETAILS")
+    print("-------" + "-" * len(major_name) + "-------")
+    print()
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    minimum_math_level = major_details[1]
+
+    print(f"MINIMUM MATH LEVEL: {minimum_math_level}")
+
+    while True:
+        print()
+        new_minimum_math_level = input("Enter New Minimum Math Level: ").upper()
+        if not checkCourse(new_minimum_math_level):
+            print("Invalid Math Course. Try Again")
+        if checkCourse(new_minimum_math_level):
+            break
+
+    while True:
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Change The Minimum Math Level? ")
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = "UPDATE Major SET minimum_math_level = %s WHERE name = %s"
+        val = (new_minimum_math_level, major_name)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        notification = f"{major_name} Minimum Math Level Has Been Changed From {minimum_math_level} To {new_minimum_math_level}"
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name,)
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Minimum Math Level Changed: Press (V) To View More Majors:\n"
+                         "                            Press (A) To Return To Admin Options").lower()
+            if back == "v":
+                view_all_majors("Dean")
+            elif back == "a":
+                dean_admin_options()
+
+
+    elif confirmation == "no":
+        view_all_majors("Dean")
+
+# CHANGE MINIMUM ENG LEVEL
+def change_minimum_eng_level(major_name, major_details):
+    clear()
+    print("-------" + "-" * len(major_name) + "-------")
+    print(f"CHANGE {major_name.upper()} DETAILS")
+    print("-------" + "-" * len(major_name) + "-------")
+    print()
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    minimum_english_level = major_details[0]
+
+    print(f"MINIMUM ENGLISH LEVEL: {minimum_english_level}")
+
+    while True:
+        print()
+        new_minimum_english_level = input("Enter New Minimum English Level: ").upper()
+        if not checkCourse(new_minimum_english_level):
+            print("Invalid English Course. Try Again")
+        if checkCourse(new_minimum_english_level):
+            break
+
+    while True:
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Change The Minimum English Level? ")
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = "UPDATE Major SET minimum_eng_level = %s WHERE name = %s"
+        val = (new_minimum_english_level, major_name)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        notification = f"{major_name} Minimum English level Has Been Changed From {minimum_english_level} To {new_minimum_english_level}"
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name,)
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Minimum English Level Changed: Press (V) To View More Majors:\n"
+                         "                               Press (A) To Return To Admin Options").lower()
+            if back == "v":
+                view_all_majors("Dean")
+            elif back == "a":
+                dean_admin_options()
+
+
+    elif confirmation == "no":
+        view_all_majors("Dean")
+
+
+
+
+
+
+
+# CHECK MAJOR
+def checkMajor(major_name):
+    db.execute("SELECT name FROM Major")
+    all_majors = db.fetchall()
+
+    all_majors = [all_majors[i][0] for i in range(len(all_majors))]
+
+    return major_name in all_majors
+
+
+
+
+
+
 
 
 # PROFESSOR MENU
@@ -2666,8 +3377,6 @@ def view_all_courses_prof():
 
 # SEARCH FOR COURSE
 def search_for_course_prof(came_from=None):
-    if came_from != None:
-        clear()
     while True:
         print()
         course_name = input("Enter The Name Of The Course: ").upper()
@@ -2679,7 +3388,7 @@ def search_for_course_prof(came_from=None):
     db.execute(sql, val)
     result = db.fetchall()
     if len(result) == 0:
-        course_not_found()
+        course_not_found("Prof Search For Course")
 
     # COURSE WAS FOUND
     select_course_prof(course_name)
@@ -2740,16 +3449,34 @@ def view_courses_taught():
         ProfessorMenu(None)
 
 # COURSE NOT FOUND
-def course_not_found():
+def course_not_found(came_from=None, argv=None):
     print()
     while True:
         print()
         error = input("That Course Was Not Found. Press (T) To Try Again:\n"
                       "                           Press (M) To Return To Professor Menu: ").lower()
         if error == "t":
-            search_for_course_prof()
+            if came_from == "Edit_Course":
+                edit_course()
+            elif came_from == "Student Search For Course":
+                search_for_course_stu()
+            elif came_from == "Dean Search For Course":
+                search_for_course_dean()
+            elif came_from == "Prof Search For Course":
+                search_for_course_prof()
+            elif came_from == "Dean Remove Course":
+                remove_course()
         elif error == "m":
-            ProfessorMenu(None)
+            if came_from == "Edit_Course":
+                DeanMenu(None)
+            elif came_from == "Student Search For Course":
+                StudentMenu(None)
+            elif came_from == "Dean Search For Course":
+                DeanMenu(None)
+            elif came_from == "Prof Search For Course":
+                ProfessorMenu(None)
+            elif came_from == "Dean Remove Course":
+                dean_admin_options()
 
 
 # SELECT COURSE
@@ -2772,7 +3499,14 @@ def select_course_prof(course_name):
     print("-" * len(course) + "------------------")
     print()
     # GET THE NAMES OF THE STUDENTS ENROLLED
-    print(f"Students In Course: {course.getStudentNamesInCourse()}")
+    names = course.getStudentNamesInCourse()
+    if names != None:
+        names = names.split()
+        students_in_course = [names[i] + " " + names[i+1] for i in range(len(names) // 2)]
+    else:
+        students_in_course = None
+
+    print(f"Students In Course: {students_in_course}")
     # IF NO STUDENTS ARE IN THE COURSE THEN THE studentsCount IS NOT SHOWN
     if course.getStudentNamesInCourse() != None:
         # GET THE STUDENT COUNT
@@ -3001,7 +3735,7 @@ def drop_student_from_course(course_name):
     else:
         view_all_courses_prof()
 # VIEW STUDENT GRADE FOR COURSE
-def view_student_grade_for_course(students_in_course, num_students_in_course, course_name):
+def view_student_grade_for_course(students_in_course, num_students_in_course, course_name, came_from=None):
     clear()
     print("-------------------")
     print("VIEW STUDENT GRADES")
@@ -3024,10 +3758,18 @@ def view_student_grade_for_course(students_in_course, num_students_in_course, co
 
     while True:
         print()
-        back = input("Press (B) To Go Back:\nPress (M) To Return To Professor Menu: ").lower()
+        if came_from == None:
+            menu_to_return = "Professor Menu"
+        elif came_from == "Dean":
+            menu_to_return = "Dean Menu"
+        back = input(f"Press (B) To Go Back:\nPress (M) To Return To {menu_to_return}: ").lower()
         if back == "b":
+            if came_from == "Dean":
+                view_students_enrolled_in_course_dean(course_name)
             select_course_prof(course_name)
         elif back == "m":
+            if came_from == "Dean":
+                DeanMenu(None)
             ProfessorMenu(None)
 
 # CHANGE PROFESSOR PASSWORD
@@ -4140,7 +4882,7 @@ def search_for_course_stu(came_from=None):
     db.execute(sql, val)
     result = db.fetchall()
     if len(result) == 0:
-        course_not_found()
+        course_not_found("Student Search For Course")
 
     # COURSE WAS FOUND
     select_course_stu(course_name)
@@ -4518,6 +5260,7 @@ def check_password_hash(password, hash):
         return True
     return False
 
+# SPECIAL FUNCTIONS
 def capitalize(word):
     word_to_return = ""
     all_words = [word.capitalize() for word in word.split()]
@@ -4528,6 +5271,10 @@ def capitalize(word):
 
     word_to_return = word_to_return.rstrip()
     return word_to_return
+def indexOf(string, index_of):
+    for i in range(len(string)):
+        if string[i] == index_of:
+            return i
 
 def update_course_database():
     # UPDATING studentsInCourse
