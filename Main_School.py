@@ -3042,6 +3042,7 @@ def dean_modify_major(major_name, major_details):
     print("1 -> Change Description")
     print("2 -> Change Minimum Math Level")
     print("3 -> Change Minimum English Level")
+    print("4 -> Change Major Requirements")
     while True:
         print()
         dean_choice = input("Choose An Option: ")
@@ -3051,6 +3052,8 @@ def dean_modify_major(major_name, major_details):
             change_minimum_math_level(major_name, major_details)
         elif dean_choice == "3":
             change_minimum_eng_level(major_name, major_details)
+        elif dean_choice == "4":
+            change_major_requirements(major_name, major_details)
 
 # CHANGE MAJOR DESCRIPTION
 def change_major_description(major_name, major_details):
@@ -3116,7 +3119,6 @@ def change_major_description(major_name, major_details):
 
     elif confirmation == "no":
         view_all_majors("Dean")
-
 # CHANGE MINIMUM MATH LEVEL
 def change_minimum_math_level(major_name, major_details):
     clear()
@@ -3175,13 +3177,12 @@ def change_minimum_math_level(major_name, major_details):
 
     elif confirmation == "no":
         view_all_majors("Dean")
-
 # CHANGE MINIMUM ENG LEVEL
 def change_minimum_eng_level(major_name, major_details):
     clear()
-    print("-------" + "-" * len(major_name) + "-------")
+    print("--------" + "-" * len(major_name) + "-------")
     print(f"CHANGE {major_name.upper()} DETAILS")
-    print("-------" + "-" * len(major_name) + "-------")
+    print("--------" + "-" * len(major_name) + "-------")
     print()
     print("-------------------")
     print("Press (C) To Cancel")
@@ -3199,6 +3200,12 @@ def change_minimum_eng_level(major_name, major_details):
         if checkCourse(new_minimum_english_level):
             break
 
+    # CHECKING IF C WAS ENTERED
+    if len(new_minimum_english_level) == 1:
+        new_minimum_english_level = new_minimum_english_level.lower()
+    if new_minimum_english_level == "c":
+        view_all_majors("Dean")
+
     while True:
         confirmation = input("CONFIRMATION: Are You Sure You Want To Change The Minimum English Level? ")
         if confirmation == "yes" or confirmation == "no":
@@ -3210,7 +3217,7 @@ def change_minimum_eng_level(major_name, major_details):
         mydb.commit()
 
         # SET UP NOTIFICATION
-        notification = f"{major_name} Minimum English level Has Been Changed From {minimum_english_level} To {new_minimum_english_level}"
+        notification = f"{major_name} Minimum English Level Has Been Changed From {minimum_english_level} To {new_minimum_english_level}"
         received_from = f"Dean ({dean_name})"
         sql = "SELECT id FROM Dean WHERE name = %s"
         val = (dean_name,)
@@ -3234,6 +3241,73 @@ def change_minimum_eng_level(major_name, major_details):
 
     elif confirmation == "no":
         view_all_majors("Dean")
+# CHANGE MAJOR REQUIREMENTS
+def change_major_requirements(major_name, major_details):
+    clear()
+    print("--------" + "-" * len(major_name) + "-------")
+    print(f"CHANGE {major_name.upper()} DETAILS")
+    print("--------" + "-" * len(major_name) + "-------")
+    print()
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    if major_details[2] != None:
+        major_requirements = major_details[2].split()
+    else:
+        major_requirements = "Not Assigned"
+
+    print(f"MAJOR REQUIREMENTS: {major_requirements}")
+    while True:
+        print()
+        new_major_requirements = input("New Major Requirements: ")
+        if not checkCourse(new_major_requirements):
+            print("One Of The Courses Entered Is Invalid. Please Check The Spelling Of All Courses Entered")
+        if checkCourse(new_major_requirements):
+            break
+    # CHECKING IF C WAS ENTERED
+    if len(new_major_requirements) == 1:
+        new_major_requirements = new_major_requirements.lower()
+    if new_major_requirements == "c":
+        view_all_majors("Dean")
+
+    while True:
+        confirmation = input("CONFIRMATION: Are Your Sure You Want To Change The Major Requirements? ")
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = "UPDATE Major SET major_requirements = %s WHERE name = %s"
+        val = (new_major_requirements, major_name)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        notification = f"{major_name} Major Requirements Have Been Changed To: {new_major_requirements.split()} "
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name,)
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Major Requirements Changed: Press (V) To View More Majors:\n"
+                         "                            Press (A) To Return To Admin Options").lower()
+            if back == "v":
+                view_all_majors("Dean")
+            elif back == "a":
+                dean_admin_options()
+
+    elif confirmation == "no":
+        dean_admin_options()
+
+
+
 
 
 
@@ -5203,6 +5277,7 @@ def checkCourse(sub_courses):
         for j in range(len(all_courses)):
             if sub_courses[i] == all_courses[j][0]:
                 counter += 1
+
     return counter == len(sub_courses)
 def age_not_num(came_from=None):
     if came_from == None:
