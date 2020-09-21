@@ -2,6 +2,7 @@ import os
 clear = lambda: os.system("cls")
 import hashlib
 from stdiomask import getpass
+from time import sleep
 try:
     import mysql.connector
 except ImportError:
@@ -703,9 +704,15 @@ def view_all_majors(came_from=None):
         val = (major_name,)
         db.execute(sql, val)
         results = db.fetchall()
-        major_description = results[0][0]
-        students_names = results[0][1]
-        student_count = results[0][2]
+        try:
+            major_description = results[0][0]
+            students_names = results[0][1]
+            student_count = results[0][2]
+        except IndexError:
+            clear()
+            print("An Error Occured")
+            sleep(1.5)
+            exit()
 
         clear()
         print("-" * len(major_name))
@@ -724,7 +731,7 @@ def view_all_majors(came_from=None):
             print()
             if came_from == "Dean":
                 back = input("Press (C) To View More Majors:\nPress (M) To Modify Major:\n"
-                             "Press (V) To View All Students In Major:\nPress (A) To Admin Options: ").lower()
+                             "Press (V) To View All Students In Major:\nPress (A) To Return Admin Options: ").lower()
                 if back == "c":
                     view_all_majors("Dean")
                 elif back == "m":
@@ -2711,7 +2718,7 @@ def dean_admin_options():
     elif dean_choice == "5":
         view_all_majors("Dean")
     elif dean_choice == "6":
-        delete_all_prof_data()
+        add_new_major()
     elif dean_choice == "7":
         remove_major()
     elif dean_choice == "8":
@@ -3064,8 +3071,111 @@ def remove_course():
 
 
 # ADD MAJOR
-def add_major():
-    pass
+def add_new_major():
+    clear()
+    print("ADD MAJOR")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    while True:
+        print()
+        new_major_name = capitalize(input("Enter The Name Of The Major: "))
+        # CHECKING IF C WAS ENTERED
+        if len(new_major_name) == 1:
+            new_major_name = new_major_name.lower()
+        if new_major_name == "c":
+            dean_admin_options()
+        if new_major_name != '':
+            break
+    while True:
+        print()
+        new_major_description = input("Enter The Description For The Major: ")
+        # CHECKING IF C WAS ENTERED
+        if len(new_major_description) == 1:
+            new_major_description = new_major_name.lower()
+        if new_major_description == "c":
+            dean_admin_options()
+        if new_major_description != '':
+            break
+    while True:
+        print()
+        minimum_eng_level = input("Enter The Minimum English Requirement: ").upper()
+        # CHECKING IF C WAS ENTERED
+        if len(minimum_eng_level) == 1:
+            minimum_eng_level = minimum_eng_level.lower()
+        if minimum_eng_level == "c":
+            dean_admin_options()
+        # VALIDATING COURSE
+        if not checkCourse(minimum_eng_level):
+            print("Invalid Course")
+        if "ENG" not in minimum_eng_level:
+            print("Course Must Be 'ENG'")
+        if checkCourse(minimum_eng_level) and "ENG" in minimum_eng_level:
+            break
+    while True:
+        print()
+        minimum_math_level = input("Enter The Minimum Math Level: ").upper()
+        # CHECKING IF C WAS ENTERED
+        if len(minimum_math_level) == 1:
+            minimum_math_level = minimum_math_level.lower()
+        if minimum_math_level == "c":
+            dean_admin_options()
+        # VALIDATING COURSE
+        if not checkCourse(minimum_math_level):
+            print("Invalid Course")
+        if "MATH" not in minimum_math_level:
+            print("Course Must Be 'MATH'")
+        if checkCourse(minimum_math_level):
+            break
+    while True:
+        print()
+        major_requirements = input("Enter The Major Requirements: ").upper()
+        # CHECKING IF C WAS ENTERED
+        if len(major_requirements) == 1:
+            major_requirements = major_requirements.lower()
+        if major_requirements == "c":
+            dean_admin_options()
+        # VALIDATING COURSE
+        if not checkCourse(major_requirements):
+            print("One Of The Courses Entered Is Invalid")
+        if checkCourse(major_requirements):
+            break
+    while True:
+        print()
+        confirmation = input("Are You Sure You Want To Add This Major? ")
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = "INSERT INTO Major (name, description, minimum_eng_level, minimum_math_level, major_requirements) VALUES (%s, %s, %s, %s, %s)"
+        val = (new_major_name, new_major_description, minimum_eng_level, minimum_math_level, major_requirements)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        notification = f"{new_major_name} Has Been Added"
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name,)
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Major Added. Press (A) To Add More Majors:\n"
+                         "             Press (M) To Return To Admin Options: ").lower()
+            if back == "a":
+                add_new_major()
+            elif back == "m":
+                dean_admin_options()
+
+    elif confirmation == "no":
+        dean_admin_options()
 # REMOVE MAJOR
 def remove_major():
     clear()
@@ -3151,12 +3261,22 @@ def dean_modify_major(major_name, major_details):
         dean_choice = input("Choose An Option: ")
         if dean_choice == "1":
             change_major_description(major_name, major_details)
+            break
         elif dean_choice == "2":
             change_minimum_math_level(major_name, major_details)
+            break
         elif dean_choice == "3":
             change_minimum_eng_level(major_name, major_details)
+            break
         elif dean_choice == "4":
             change_major_requirements(major_name, major_details)
+            break
+        elif dean_choice == "c":
+            view_all_majors("Dean")
+            break
+        elif dean_choice == "a":
+            dean_admin_options()
+            break
 
 # CHANGE MAJOR DESCRIPTION
 def change_major_description(major_name, major_details):
