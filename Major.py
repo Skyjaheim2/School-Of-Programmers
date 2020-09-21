@@ -49,7 +49,12 @@ class Major():
         elif method == "POST":
             return result
 
-
+    @classmethod
+    def getAllMajors(cls):
+        db.execute("SELECT name FROM Major")
+        all_majors = db.fetchall()
+        all_majors = [all_majors[i][0] for i in range(len(all_majors))]
+        return all_majors
 
 
 

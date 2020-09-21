@@ -89,6 +89,7 @@ def DeanLogin():
         incorrect_password("Dean")
 
     update_course_database()
+    update_major_database()
     DeanMenu(dean_name)
 
 
@@ -125,6 +126,7 @@ def ProfessorLogin():
         incorrect_password("Professor")
 
     update_course_database()
+    update_major_database()
     ProfessorMenu(prof_name)
 
 
@@ -161,6 +163,7 @@ def StudentLogin():
         incorrect_password("Student")
 
     update_course_database()
+    update_major_database()
     StudentMenu(stu_name)
 
 # INCORRECT PASSWORD
@@ -695,30 +698,39 @@ def view_all_majors(came_from=None):
                         StudentMenu(None)
                         break
 
-        # GETTING THE DESCRIPTION OF THE MAJOR
-        sql = "SELECT description FROM Major WHERE name = %s"
-        val = (major_name, )
+        # GETTING THE DESCRIPTION, NAMES AND STUDENT COUNT IN THE MAJOR
+        sql = "SELECT description, studentNames, studentCount FROM Major WHERE name = %s"
+        val = (major_name,)
         db.execute(sql, val)
-        major_description = db.fetchall()[0][0]
+        results = db.fetchall()
+        major_description = results[0][0]
+        students_names = results[0][1]
+        student_count = results[0][2]
 
         clear()
         print("-" * len(major_name))
         print(major_name.upper())
         print("-" * len(major_name))
         print()
+        print("------------------------" + "-" * len(str(student_count)))
+        print(f"STUDENT COUNT IN MAJOR: {student_count}")
+        print("------------------------" + "-" * len(str(student_count)))
+        print()
         print(major_description)
         major = Major(major_name)
-        print()
         major.getRequiredCourse("GET")
 
         while True:
             print()
             if came_from == "Dean":
-                back = input("Press (C) To View More Majors:\nPress (M) To Modify Major:\nPress (A) To Admin Options: ").lower()
+                back = input("Press (C) To View More Majors:\nPress (M) To Modify Major:\n"
+                             "Press (V) To View All Students In Major:\nPress (A) To Admin Options: ").lower()
                 if back == "c":
                     view_all_majors("Dean")
                 elif back == "m":
                     dean_modify_major(major_name, major.getRequiredCourse("POST"))
+                elif back == "v":
+                    view_students_in_major(major_name, students_names)
                 elif back == "a":
                     dean_admin_options()
             elif came_from == "Student":
@@ -735,6 +747,27 @@ def view_all_majors(came_from=None):
         elif came_from == "Prof":
             ProfessorMenu(None)
 
+# VIEW STUDENTS IN MAJOR
+def view_students_in_major(major_name, student_names):
+    student_names = student_names.split()
+    clear()
+    print("------------" + "-" * len(major_name))
+    print(f"STUDENTS IN {major_name.upper()}")
+    print("------------" + "-" * len(major_name))
+    print()
+    student_names = [student_names[i] + " " + student_names[i + 1] for i in range(len(student_names) // 2)]
+
+    for name in student_names:
+        print(name)
+    if len(student_names) == 0:
+        print("No Students")
+
+    while True:
+        print()
+        back = input("Press (B) To Go Back: ").lower()
+        if back == "b":
+            view_all_majors("Dean")
+            break
 
 # TAKE ACTION ON STUDENT
 def take_action_on_student(name=None):
@@ -3028,9 +3061,7 @@ def remove_course():
         elif confirmation == "no":
             DeanMenu(None)
 
-
-
-
+# MODIFY MAJOR
 def dean_modify_major(major_name, major_details):
     print()
     print("-------" + "-" * len(major_name))
@@ -3066,7 +3097,6 @@ def change_major_description(major_name, major_details):
     print("Press (C) To Cancel")
     print("-------------------")
     print()
-
 
     sql = "SELECT description FROM Major WHERE name = %s"
     val = (major_name, )
@@ -3115,7 +3145,6 @@ def change_major_description(major_name, major_details):
                 view_all_majors("Dean")
             elif back == "a":
                 dean_admin_options()
-
 
     elif confirmation == "no":
         view_all_majors("Dean")
@@ -5351,6 +5380,7 @@ def indexOf(string, index_of):
         if string[i] == index_of:
             return i
 
+# UPDATE COURSE DATABASE
 def update_course_database():
     # UPDATING studentsInCourse
     all_courses = Course.getAll_Courses()
@@ -5403,6 +5433,52 @@ def update_course_database():
         val = (professors_to_add_to_database, all_courses[i][0])
         db.execute(sql, val)
         mydb.commit()
+
+# UPDATE MAJOR DATABASE
+def update_major_database():
+    all_majors = Major.getAllMajors()
+    # UPDATE STUDENT COUNT
+    for major in all_majors:
+        sql = "SELECT COUNT(major) FROM Student WHERE major = %s"
+        val = (major,)
+        db.execute(sql, val)
+        major_count = int(db.fetchall()[0][0])
+        sql = "UPDATE Major SET studentCount = %s WHERE name = %s"
+        val = (major_count, major)
+        db.execute(sql, val)
+        mydb.commit()
+
+    # UPDATE STUDENT NAMES
+    for major in all_majors:
+        sql = "SELECT name FROM Student WHERE major = %s"
+        val = (major,)
+        db.execute(sql, val)
+        student_name = db.fetchall()
+        # print(student_name, len(student_name))
+        if len(student_name) == 0:
+            sql = "UPDATE Major SET studentNames = 'None' WHERE name = %s"
+            val = (major,)
+            db.execute(sql, val)
+            mydb.commit()
+        else:
+            if len(student_name) == 1:
+                student_name = student_name[0][0]
+                sql = "UPDATE Major SET studentNames = %s WHERE name = %s"
+                val = (student_name, major)
+                db.execute(sql, val)
+                mydb.commit()
+            else:
+                all_student_names = ""
+                for names in student_name:
+                    all_student_names += names[0]
+                    all_student_names += " "
+                all_student_names = all_student_names.rstrip()
+                sql = "UPDATE Major SET studentNames = %s WHERE name = %s"
+                val = (all_student_names, major)
+                db.execute(sql, val)
+                mydb.commit()
+
+
 
 if __name__ == '__main__':
     login()
