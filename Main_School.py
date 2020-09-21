@@ -2713,7 +2713,7 @@ def dean_admin_options():
     elif dean_choice == "6":
         delete_all_prof_data()
     elif dean_choice == "7":
-        delete_all_stu_data()
+        remove_major()
     elif dean_choice == "8":
         delete_all_data()
     else:
@@ -2994,6 +2994,7 @@ def edit_course(courseName=None, courseDescriptionOrName=None):
 def remove_course():
     clear()
     print("REMOVE COURSE")
+    print(now)
     print("-------------------")
     print("Press (C) To Cancel")
     print("-------------------")
@@ -3060,6 +3061,77 @@ def remove_course():
                     break
         elif confirmation == "no":
             DeanMenu(None)
+
+
+# ADD MAJOR
+def add_major():
+    pass
+# REMOVE MAJOR
+def remove_major():
+    clear()
+    print("REMOVE MAJOR")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    while True:
+        print()
+        major_to_remove = capitalize(input("Enter Major To Remove: "))
+        if len(major_to_remove) == 1:
+            major_to_remove = major_to_remove.lower()
+        if major_to_remove == "c":
+            dean_admin_options()
+        # VALIDATING MAJOR ENTERED
+        if not checkMajor(major_to_remove):
+            print("Invalid Major")
+        if checkMajor(major_to_remove):
+            break
+
+    while True:
+        print()
+        reason = input("Why Is This Major Being Removed? ")
+        if reason != '':
+            break
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Are You Sure You Want To Remove {major_to_remove}?" )
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = "DELETE FROM Major WHERE name = %s"
+        val = (major_to_remove, )
+        db.execute(sql, val)
+        mydb.commit()
+
+        # SET UP NOTIFICATION
+        notification = f"{major_to_remove} Has Been Removed Because: {reason}"
+        received_from = f"Dean ({dean_name})"
+        sql = "SELECT id FROM Dean WHERE name = %s"
+        val = (dean_name,)
+        db.execute(sql, val)
+        dean_id = db.fetchall()[0][0]
+
+        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, dean_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Major Removed. Press (R) To Remove More Majors:\n"
+                         "               Press (A) To Return To Admin Options: ").lower()
+            if back == "r":
+                remove_major()
+            elif back == "a":
+                dean_admin_options()
+    elif confirmation == "no":
+        view_all_majors("Dean")
+
+
+
+
+
+
 
 # MODIFY MAJOR
 def dean_modify_major(major_name, major_details):
@@ -3166,10 +3238,18 @@ def change_minimum_math_level(major_name, major_details):
     while True:
         print()
         new_minimum_math_level = input("Enter New Minimum Math Level: ").upper()
+        # CHECKING IF C WAS ENTERED
+        if len(new_minimum_math_level) == 1:
+            new_minimum_math_level = new_minimum_math_level.lower()
+        if new_minimum_math_level == "c":
+            view_all_majors("Dean")
+        # VALIDATING COURSE ENTERED
         if not checkCourse(new_minimum_math_level):
             print("Invalid Math Course. Try Again")
         if checkCourse(new_minimum_math_level):
             break
+
+
 
     while True:
         confirmation = input("CONFIRMATION: Are You Sure You Want To Change The Minimum Math Level? ")
@@ -3224,16 +3304,18 @@ def change_minimum_eng_level(major_name, major_details):
     while True:
         print()
         new_minimum_english_level = input("Enter New Minimum English Level: ").upper()
+        # CHECKING IF C WAS ENTERED
+        if len(new_minimum_english_level) == 1:
+            new_minimum_english_level = new_minimum_english_level.lower()
+        if new_minimum_english_level == "c":
+            view_all_majors("Dean")
+        # VALIDATING COURSE ENTERED
         if not checkCourse(new_minimum_english_level):
             print("Invalid English Course. Try Again")
         if checkCourse(new_minimum_english_level):
             break
 
-    # CHECKING IF C WAS ENTERED
-    if len(new_minimum_english_level) == 1:
-        new_minimum_english_level = new_minimum_english_level.lower()
-    if new_minimum_english_level == "c":
-        view_all_majors("Dean")
+
 
     while True:
         confirmation = input("CONFIRMATION: Are You Sure You Want To Change The Minimum English Level? ")
