@@ -61,7 +61,7 @@ def login():
 # DEAN LOGIN
 def DeanLogin():
     clear()
-    global dean_name
+    global dean_name, dean_password
     print("LOGIN AS DEAN")
     print(now)
     print("-------------------")
@@ -242,16 +242,17 @@ def register_as_dean():
     print("-------------------")
     print("Press (C) To Cancel")
     print("-------------------")
-    print()
     while True:
+        print()
         dean_name = input("Enter Your Full Name: ")
-        if dean_name != '':
+        # CHECKING IF C WAS ENTERED
+        if dean_name.lower() == "c":
+            login()
+        if len(dean_name.split()) == 0 or len(dean_name.split()) == 1:
+            print("Full Name Is Required")
+        else:
             break
-    # CHECKING IF C WAS ENTERED
-    if len(dean_name) == 1:
-        dean_name = dean_name.lower()
-    if dean_name == "c":
-        login()
+
 
     # CHECK IF PERSON IS ALREADY REGISTERED
     sql = "SELECT * FROM Dean WHERE name = %s"
@@ -266,12 +267,16 @@ def register_as_dean():
     # SECURITY ANIMAL
     while True:
         dean_s_animal = input("SECURITY QUESTION: What Is The Name Of Your Favorite Animal? ").lower()
+        if dean_s_animal == "c":
+            login()
         if dean_s_animal != '':
             break
 
     # PASSWORD
     while True:
         dean_password = input("Enter Your Password: ")
+        if dean_password.lower() == "c":
+            login()
         if dean_password != '':
             break
 
@@ -282,6 +287,8 @@ def register_as_dean():
     # CONFIRM PASSWORD
     while True:
         confirm_dean_password = input("Confirm Your Password: ")
+        if confirm_dean_password.lower() == "c":
+            login()
         if confirm_dean_password != '':
             break
 
@@ -316,16 +323,17 @@ def register_as_professor():
     print("-------------------")
     print("Press (C) To Cancel")
     print("-------------------")
-    print()
     while True:
+        print()
         prof_name = input("Enter Your Full Name: ")
-        if prof_name != '':
+        # CHECKING IC WAS ENTERED
+        if prof_name.lower() == "c":
+            login()
+        if len(prof_name.split()) == 0 or len(prof_name.split()) == 1:
+            print("Full Name Is Required")
+        else:
             break
-    # CHECKING IF C WAS ENTERED
-    if len(prof_name) == 1:
-        prof_name = prof_name.lower()
-    if prof_name == "c":
-        login()
+
 
     sql = "SELECT * FROM Professor WHERE name = %s"
     val = (prof_name, )
@@ -340,12 +348,16 @@ def register_as_professor():
     # SECURITY ANIMAL
     while True:
         prof_s_animal = input("SECURITY QUESTION: What Is The Name Of Your Favorite Animal? ").lower()
+        if prof_s_animal == "c":
+            login()
         if prof_s_animal != '':
             break
 
     # PASSWORD
     while True:
         prof_password = input("Enter Your Password: ")
+        if prof_password.lower() == "c":
+            login()
         if prof_password != '':
             break
 
@@ -355,6 +367,8 @@ def register_as_professor():
     # CONFIRM PASSWORD
     while True:
         confirm_prof_password = input("Confirm Your Password: ")
+        if confirm_prof_password.lower() == "c":
+            login()
         if confirm_prof_password != '':
             break
 
@@ -367,18 +381,21 @@ def register_as_professor():
     # ADDRESS
     while True:
         prof_address = input("Enter Your Address: ")
+        if prof_address.lower() == "c":
+            login()
         if prof_address != '':
             break
 
     # AGE
     while True:
-        try:
-            prof_age = int(input("Enter Your Age: "))
-        except ValueError:
-            prof_age = age_not_num()
-        if prof_age != '':
+        prof_age = input("Enter Your Age: ")
+        if prof_age.lower() == "c":
+            login()
+        if not checkAge(prof_age):
+            print("Your Age Must Be A Number")
+        if checkAge(prof_age):
             break
-
+    prof_age = int(prof_age)
 
     # PHONE NUMBER
     while True:
@@ -398,17 +415,131 @@ def register_as_professor():
             break
 
     # CHECKING IF THE COURSES ARE AVAILABLE
-    prof_courses_taught = sanitize_courses(prof_courses_taught)
-
+    prof_courses_taught = sanitize_courses(prof_courses_taught, "Register_As_Prof")
 
 
     Prof = Professor(prof_name.split()[0], prof_name.split()[1], prof_address, prof_age, prof_phone_number, None, prof_courses_taught)
 
 
-
     sql = "INSERT INTO Professor (name, address, email, age, phoneNumber, salary, CoursesTaught, security_animal, password) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
     val = (prof_name, Prof.getAddress(), Prof.getEmail(), Prof.getAge(), Prof.getPhoneNumber(), 60000.00, prof_courses_taught,
            prof_s_animal, confirm_prof_password)
+
+    db.execute(sql, val)
+    mydb.commit()
+
+    print()
+    while True:
+        tmp = input("You Have Been Registered. Press (L) To Login: ").lower()
+        if tmp == "l":
+            login()
+
+
+
+
+
+
+
+# REGISTER AS STUDENT
+def register_as_student():
+    clear()
+    print("REGISTER AS STUDENT")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    while True:
+        print()
+        student_name = input("Enter Your Full Name: ")
+        if student_name.lower() == "c":
+            login()
+        if len(student_name.split()) == 0 or len(student_name.split()) == 1:
+            print("Full Name Required")
+        else:
+            break
+
+    sql = "SELECT * FROM Student WHERE name = %s"
+    val = (student_name, )
+
+    db.execute(sql, val)
+    result = db.fetchall()
+
+    # CHECK IF PERSON IS ALREADY REGISTERED
+    if len(result) != 0:
+        already_registered()
+
+    # SECURITY ANIMAL
+    while True:
+        student_s_animal = input("SECURITY QUESTION: What Is The Name Of Your Favorite Animal? ").lower()
+        if student_s_animal == "c":
+            login()
+        if student_s_animal != '':
+            break
+
+    # PASSWORD
+    while True:
+        student_password = getpass("Enter Your Password: ")
+        if student_password.lower() == "c":
+            login()
+        if student_password != '':
+            break
+
+    # SANITIZE PASSWORD
+    student_password = sanitize_password(student_password, student_name)
+
+    # CONFIRM PASSWORD
+    while True:
+        confirm_student_password = getpass("Confirm Your Password: ")
+        if confirm_student_password.lower() == "c":
+            login()
+        if confirm_student_password != '':
+            break
+
+    if student_password != confirm_student_password:
+        confirm_student_password = confirm_password_error(student_name)
+
+    # HASH PASSWORD
+    confirm_student_password = hash_password(confirm_student_password)
+
+    # ADDRESS
+    while True:
+        student_address = input("Enter Your Address: ")
+        if student_address.lower() == "c":
+            login()
+        if student_address != '':
+            break
+
+    # AGE
+    while True:
+        student_age = input("Enter Your Age: ")
+        if student_age.lower() == "c":
+            login()
+        if not checkAge(student_age):
+            print("Your Age Must Be A Number")
+            print()
+        else:
+            break
+    student_age = int(student_age)
+
+
+    # PHONE NUMBER
+    while True:
+        student_phone_number = input("Enter Your Phone Number: ")
+        if student_phone_number.lower() == "c":
+            login()
+        if student_phone_number != '':
+            break
+
+    # SANITIZE PHONE NUMBER
+    student_phone_number = sanitize_phone_number(student_phone_number)
+
+
+    Stu = Student(student_name.split()[0], student_name.split()[1], student_address, student_age, student_phone_number, None, None, None)
+
+
+    sql = "INSERT INTO Student (name, address, email, age, phoneNumber, CoursesEnrolledIn, grades, major, GPA, security_animal, password) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    val = (student_name, Stu.getAddress(), Stu.getEmail(), Stu.getAge(), Stu.getPhoneNumber(), Stu.getCoursesEnrolledIn(),
+           Stu.getGrades(), Stu.getMajor(), Stu.getGPA(), student_s_animal, confirm_student_password)
 
     db.execute(sql, val)
     mydb.commit()
@@ -446,109 +577,6 @@ def already_registered(came_from=None):
                 register_professor()
             elif tmp == "b":
                 DeanMenu(None)
-
-
-
-
-# REGISTER AS PROFESSOR
-def register_as_student():
-    clear()
-    print("REGISTER AS STUDENT")
-    print(now)
-    print("-------------------")
-    print("Press (C) To Cancel")
-    print("-------------------")
-    print()
-    while True:
-        student_name = input("Enter Your Full Name: ")
-        if student_name != '':
-            break
-    # CHECKING IF C WAS ENTERED
-    if len(student_name) == 1:
-        student_name = student_name.lower()
-    if student_name == "c":
-        login()
-
-    sql = "SELECT * FROM Student WHERE name = %s"
-    val = (student_name, )
-
-    db.execute(sql, val)
-    result = db.fetchall()
-
-    # CHECK IF PERSON IS ALREADY REGISTERED
-    if len(result) != 0:
-        already_registered()
-
-    # SECURITY ANIMAL
-    while True:
-        student_s_animal = input("SECURITY QUESTION: What Is The Name Of Your Favorite Animal? ").lower()
-        if student_s_animal != '':
-            break
-
-    # PASSWORD
-    while True:
-        student_password = input("Enter Your Password: ")
-        if student_password != '':
-            break
-
-    # SANITIZE PASSWORD
-    student_password = sanitize_password(student_password, student_name)
-
-    # CONFIRM PASSWORD
-    while True:
-        confirm_student_password = input("Confirm Your Password: ")
-        if confirm_student_password != '':
-            break
-
-    if student_password != confirm_student_password:
-        confirm_student_password = confirm_password_error(student_name)
-
-    # HASH PASSWORD
-    confirm_student_password = hash_password(confirm_student_password)
-
-    # ADDRESS
-    while True:
-        student_address = input("Enter Your Address: ")
-        if student_address != '':
-            break
-
-    # AGE
-    while True:
-        try:
-            student_age = int(input("Enter Your Age: "))
-        except ValueError:
-            student_age = age_not_num()
-        if student_age != '':
-            break
-
-
-    # PHONE NUMBER
-    while True:
-        student_phone_number = input("Enter Your Phone Number: ")
-        if student_phone_number != '':
-            break
-
-    # SANITIZE PHONE NUMBER
-    student_phone_number = sanitize_phone_number(student_phone_number)
-
-
-    Stu = Student(student_name.split()[0], student_name.split()[1], student_address, student_age, student_phone_number, None, None, None)
-
-
-    sql = "INSERT INTO Student (name, address, email, age, phoneNumber, CoursesEnrolledIn, grades, major, GPA, security_animal, password) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    val = (student_name, Stu.getAddress(), Stu.getEmail(), Stu.getAge(), Stu.getPhoneNumber(), Stu.getCoursesEnrolledIn(),
-           Stu.getGrades(), Stu.getMajor(), Stu.getGPA(), student_s_animal, confirm_student_password)
-
-    db.execute(sql, val)
-    mydb.commit()
-
-    print()
-    while True:
-        tmp = input("You Have Been Registered. Press (L) To Login: ").lower()
-        if tmp == "l":
-            login()
-
-
 
 
 # DEAN MENU
@@ -809,7 +837,8 @@ def view_specific_student():
     print("2 -> Search By Full Name")
     print("3 -> Search By Email")
     print("4 -> Search By Age")
-    print("5 -> Search By Courses Enrolled In")
+    print("5 -> Search By Major")
+    print("6 -> Search By Courses Enrolled In")
     print()
     while True:
         user_choice = input("Choose An Option: ").lower()
@@ -825,6 +854,8 @@ def view_specific_student():
         elif user_choice == "4":
             search_student("Age", "age")
         elif user_choice == "5":
+            search_student("Major", "major")
+        elif user_choice == "6":
             search_student("Courses Enrolled In", "CoursesEnrolledIn")
 def search_student(search_for, column_name):
     clear()
@@ -841,11 +872,13 @@ def search_student(search_for, column_name):
     if where_val == "c":
         DeanMenu(None)
     print()
-    like_query = f"%{where_val}%"
-    sql = f"SELECT * FROM Student WHERE {column_name} LIKE %s"
-    val = (like_query,)
-
-    db.execute(sql, val)
+    if where_val != "NULL":
+        like_query = f"%{where_val}%"
+        sql = f"SELECT * FROM Student WHERE {column_name} LIKE %s"
+        val = (like_query,)
+        db.execute(sql, val)
+    else:
+        db.execute(f"SELECT * FROM Student WHERE {column_name} IS NULL")
 
     found_students = db.fetchall()
 
@@ -987,13 +1020,13 @@ def update_student(current_change, column, name):
         if Stu.setCoursesEnrolledIn(new_courses) == -1:
             while True:
                 print()
-                error = input("Can't Set Course Check If All Courses Entered Are Available. Press (T) To Try Again:\n"
-                              "                                                             Press (V) To View All Courses:\n"
-                              "                                                             Press (M) To Return To Dean Menu: ").lower()
+                error = input("Can't Set Course. Check If All Courses Entered Are Available. Press (T) To Try Again:\n"
+                              "                                                              Press (V) To View All Courses:\n"
+                              "                                                              Press (M) To Return To Dean Menu: ").lower()
                 if error == "t":
                     update_student('Courses Enrolled In', 'CoursesEnrolledIn', student_name)
                 elif error == "v":
-                    view_all_courses_dean()
+                    view_all_course_general("Dean_Update_Student_Courses", ["Courses Enrolled In", "CoursesEnrolledIn", student_name])
                 elif error == "m":
                     DeanMenu(None)
 
@@ -1194,7 +1227,7 @@ def update_student(current_change, column, name):
 
     else:
         update_student_info()
-def no_person_found(came_from=None, argv=None):
+def no_person_found(came_from=None, argv=None, kwargs=None):
     if came_from == None:
         while True:
             print()
@@ -1253,14 +1286,37 @@ def no_person_found(came_from=None, argv=None):
 
     elif came_from == "Notification":
         if argv == "Dean":
-            menu = "Dean Menu"
-            who = "Dean"
+            if kwargs == "Send_To_Stu":
+                menu = "Dean Menu"
+                who  = "Student"
+            elif kwargs == "Send_To_Prof":
+                menu = "Dean Menu"
+                who  = "Professor"
+            elif kwargs == "Send_To_Dean":
+                menu = "Dean Menu"
+                who  = "Dean"
+
         elif argv == "Prof":
-            menu = "Professor Menu"
-            who = "Professor"
+            if kwargs == "Send_To_Stu":
+                menu = "Professor Menu"
+                who = "Student"
+            elif kwargs == "Send_To_Prof":
+                menu = "Professor Menu"
+                who = "Professor"
+            elif kwargs == "Send_To_Dean":
+                menu = "Professor Menu"
+                who = "Dean"
+
         elif argv == "Stu":
-            menu = "Student Menu"
-            who = "Student"
+            if kwargs == "Send_To_Stu":
+                menu = "Student Menu"
+                who  = "Student"
+            elif kwargs == "Send_To_Prof":
+                menu = "Student Menu"
+                who  = "Professor"
+            elif kwargs == "Send_To_Dean":
+                menu = "Student Menu"
+                who  = "Dean"
         while True:
             print()
             print(f"That {who} Was Not Found")
@@ -1307,14 +1363,7 @@ def view_all_courses_dean():
     description = db.fetchall()
 
     for i, course in enumerate(all_courses):
-        index = 0
-        # SEPARATE THE FULL COURSE NAME FROM THE DESCRIPTION
-        for j in range(len(description)):
-            if description[i][0][j] == ':':
-                break
-            index += 1
-
-        print(f"{all_courses[i][0]} - {description[i][0][:index]}")
+        print(f"{all_courses[i][0]} - {description[i][0][:indexOf(description[i][0], ':')]}")
         print()
 
     while True:
@@ -1374,6 +1423,7 @@ def select_course_dean(course_name):
     while True:
         print("Press (S) To Search Again:")
         print("Press (E) To Enroll A Student In This Course:")
+        print("Press (C) To Return To All Courses:")
         if course.getStudentCountInCourse() != 0:
             print("Press (V) To View All Students Enrolled In This Course: ")
         back = input("Press (A) To Return To Admin Options: ").lower()
@@ -1381,6 +1431,8 @@ def select_course_dean(course_name):
             search_for_course_dean("Search")
         elif back == "e":
             enroll_student_in_course(course_name)
+        elif back == "c":
+            view_all_courses_dean()
         elif course.getStudentCountInCourse() != 0 and back == "v":
             view_students_enrolled_in_course_dean(course_name)
         elif back == "a":
@@ -1543,7 +1595,7 @@ def register_student():
     if len(student_name) == 1:
         student_name = student_name.lower()
     if student_name == "c":
-        login()
+        DeanMenu(None)
 
     sql = "SELECT * FROM Student WHERE name = %s"
     val = (student_name, )
@@ -1590,12 +1642,14 @@ def register_student():
 
     # AGE
     while True:
-        try:
-            student_age = int(input("Enter Their Age: "))
-        except ValueError:
-            student_age = age_not_num('Student')
-        if student_age != '':
+        student_age = input("Enter Their Age: ")
+        if student_age.lower() == "c":
+            DeanMenu(None)
+        if not checkAge(student_age):
+            print("Their Age Must Be A Number")
+        else:
             break
+    student_age = int(student_age)
 
 
     # PHONE NUMBER
@@ -1652,6 +1706,28 @@ def unregister_student():
             no_person_found("Unregister Student")
 
         # UNREGISTER THE STUDENT
+        stu_id, name, address, email, age, phone_number, courses_enrolled_in, grades, major, gpa = \
+        result[0][0], result[0][1], result[0][2], result[0][3], result[0][4], result[0][5], result[0][6], result[0][7], \
+        result[0][8], result[0][9]
+
+        print()
+        print("<" * (len(address) // 2), "DETAILS", ">" * (len(address) // 2 + 1))
+        print()
+        print("-" * len(address) + "---------")
+        print()
+        print(f"Id: {stu_id}")
+        print(f"Name: {name}")
+        print(f"Address: {address}")
+        print(f"Email: {email}")
+        print(f"Age: {age}")
+        print(f"Phone Number: {phone_number}")
+        print(f"Courses Enrolled In: {courses_enrolled_in}")
+        print(f"Grades: {grades}")
+        print(f"Major: {major}")
+        print(f"GPA: {gpa}")
+        print()
+        print("-" * len(address) + "---------")
+        print()
         while True:
             confirmation = input(f"CONFIRMATION: Are You Sure You Want To Unregister {result[0][1]}? ").lower()
             if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
@@ -1682,8 +1758,29 @@ def unregister_student():
         result = db.fetchall()
         if len(result) == 0:
             no_person_found("Unregister Student")
-
         # UNREGISTER THE STUDENT
+        stu_id, name, address, email, age, phone_number, courses_enrolled_in, grades, major, gpa = \
+        result[0][0], result[0][1], result[0][2], result[0][3], result[0][4], result[0][5], result[0][6], \
+        result[0][7],result[0][8], result[0][9]
+
+        print()
+        print("<" * (len(address) // 2), "DETAILS", ">" * (len(address) // 2 + 1))
+        print()
+        print("-" * len(address) + "---------")
+        print()
+        print(f"Id: {stu_id}")
+        print(f"Name: {name}")
+        print(f"Address: {address}")
+        print(f"Email: {email}")
+        print(f"Age: {age}")
+        print(f"Phone Number: {phone_number}")
+        print(f"Courses Enrolled In: {courses_enrolled_in}")
+        print(f"Grades: {grades}")
+        print(f"Major: {major}")
+        print(f"GPA: {gpa}")
+        print()
+        print("-" * len(address) + "---------")
+        print()
         while True:
             confirmation = input(f"CONFIRMATION: Are You Sure You Want To Unregister {result[0][1]}? ").lower()
             if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
@@ -1723,20 +1820,31 @@ def dean_inbox():
     if len(all_notifications) == 0:
         print("No Notifications")
 
-
     for i in range(len(all_notifications)):
+        # NORMAL MESSAGE LENGTH
         if len(all_notifications[i][1]) <= 188:
-            print("-" * len(all_notifications[i][1]) + "---------")
+            # AUTO FIT THE BROKEN LINES
+            max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2]) + 3])
+            if max_len_of_attributes == len(all_notifications[i][1]):
+                broken_line_added = "-" * len("Message: ")
+            else:
+                broken_line_added = "-" * len("Received From: Id:")
+
+            print("-" * max_len_of_attributes + broken_line_added)
+        # MESSAGE LENGTH EXCEEDED LIMIT
         else:
             print("-" * 109 + "---------\n")
+
         print(f"Id: {all_notifications[i][0]}")
         print(f"Date: {all_notifications[i][3]}")
         print(f"Received From: {all_notifications[i][2]} Id: {all_notifications[i][4]}")
         print(f"Message: {all_notifications[i][1]}")
+        # NORMAL MESSAGE LENGTH
         if len(all_notifications[i][1]) <= 188:
-            print("-" * len(all_notifications[i][1]) + "---------")
+            print("-" * max_len_of_attributes + broken_line_added)
+        # MESSAGE LENGTH EXCEEDED LIMIT
         else:
-            print("-" * 109 + "---------")
+            print("-" * 109 + "---------\n")
         print()
 
     while True:
@@ -1937,9 +2045,7 @@ def dean_send_notification():
             print("Messages Can Only Be Sent To: Dean, Professor Or Student")
 
     # CHECKING IF C WAS ENTERED
-    if len(to) == 1:
-        to = to.lower()
-    if to == "c":
+    if to.lower() == "c":
         DeanMenu(None)
 
     # STUDENT
@@ -1947,6 +2053,8 @@ def dean_send_notification():
         while True:
             print()
             stu_name = capitalize(input("Enter The Name Of The Student: "))
+            if stu_name.lower() == "c":
+                DeanMenu(None)
             if stu_name != '':
                 break
         sql = "SELECT id FROM Student WHERE name = %s"
@@ -1954,7 +2062,7 @@ def dean_send_notification():
         db.execute(sql, val)
         stu_id = db.fetchall()
         if len(stu_id) == 0:
-            no_person_found("Notification", "Dean")
+            no_person_found("Notification", "Dean", "Send_To_Stu")
         stu_id = stu_id[0][0]
 
         while True:
@@ -1982,6 +2090,8 @@ def dean_send_notification():
         while True:
             print()
             professor_name = capitalize(input("Enter The Name Of The Professor: "))
+            if professor_name.lower() == "c":
+                DeanMenu(None)
             if professor_name != '':
                 break
         sql = "SELECT id FROM Professor WHERE name = %s"
@@ -1989,7 +2099,7 @@ def dean_send_notification():
         db.execute(sql, val)
         prof_id = db.fetchall()
         if len(prof_id) == 0:
-            no_person_found("Notification", "Dean")
+            no_person_found("Notification", "Dean", "Send_To_Prof")
         prof_id = prof_id[0][0]
 
         while True:
@@ -2019,6 +2129,8 @@ def dean_send_notification():
         while True:
             print()
             deanName = capitalize(input("Enter The Name Of The Dean: "))
+            if deanName.lower() == "c":
+                DeanMenu(None)
             if deanName != '':
                 break
         # CHECKING IF CORRECT NAME WAS ENTERED
@@ -2027,7 +2139,7 @@ def dean_send_notification():
         db.execute(sql, val)
         result = db.fetchall()
         if len(result) == 0:
-            no_person_found("Notification", "Dean")
+            no_person_found("Notification", "Dean", "Send_To_Dean")
 
         # GETTING THE ID OF THE DEAN
         sql = "SELECT id FROM Dean WHERE name = %s"
@@ -2361,9 +2473,12 @@ def update_professor(current_change, column, name):
             while True:
                 print()
                 error = input("Can't Set Course Check If All Courses Entered Are Available. Press (T) To Try Again:\n"
+                              "                                                             Press (V) To View All Courses:\n"
                               "                                                             Press (M) To Return To Dean Menu: ").lower()
                 if error == "t":
                     update_professor('Courses Taught', 'CoursesTaught', professor_name)
+                elif error == "v":
+                    view_all_course_general("Dean_Update_Prof_Courses_Taught", ["Courses Taught", "CoursesTaught", professor_name])
                 elif error == "m":
                     DeanMenu(None)
 
@@ -2490,7 +2605,7 @@ def register_professor():
 
     # PASSWORD
     while True:
-        prof_password = input("Enter Their Password: ")
+        prof_password = getpass("Enter Their Password: ")
         if prof_password != '':
             break
 
@@ -2499,7 +2614,7 @@ def register_professor():
 
     # CONFIRM PASSWORD
     while True:
-        confirm_prof_password = input("Confirm Their Password: ")
+        confirm_prof_password = getpass("Confirm Their Password: ")
         if confirm_prof_password != '':
             break
 
@@ -2517,13 +2632,14 @@ def register_professor():
 
     # AGE
     while True:
-        try:
-            prof_age = int(input("Enter Their Age: "))
-        except ValueError:
-            prof_age = age_not_num("Professor")
-        if prof_age != '':
+        prof_age = input("Enter Their Age: ")
+        if prof_age == "c":
+            DeanMenu(None)
+        if not checkAge(prof_age):
+            print("Their Age Must Be A Number")
+        else:
             break
-
+    prof_age = int(prof_age)
 
     # PHONE NUMBER
     while True:
@@ -2538,12 +2654,12 @@ def register_professor():
 
     # COURSES TAUGHT
     while True:
-        prof_courses_taught = input("Enter The Courses You Teach: ")
+        prof_courses_taught = input("Enter Their Courses Taught: ")
         if prof_courses_taught != '':
             break
 
     # CHECKING IF THE COURSES ARE AVAILABLE
-    prof_courses_taught = sanitize_courses(prof_courses_taught, "Professor")
+    prof_courses_taught = sanitize_courses(prof_courses_taught, "Dean_Register_Professor")
 
 
 
@@ -2685,12 +2801,18 @@ def unregister_professor():
 
 # DEAN ADMIN OPTIONS
 def dean_admin_options():
+    sql = "SELECT id FROM Dean WHERE name = %s"
+    val = (dean_name, )
+    db.execute(sql, val)
+    dean_id = db.fetchall()[0][0]
     clear()
     print("DEAN ADMIN OPTIONS")
     print(now)
     print("--------------------------------")
     print("Press (M) To Return To Dean Menu")
     print("--------------------------------")
+    print()
+    print("Press (C) To Change Your Password")
     print()
     print("Available Options")
     print()
@@ -2723,6 +2845,8 @@ def dean_admin_options():
         remove_major()
     elif dean_choice == "8":
         delete_all_data()
+    elif dean_choice == "c":
+        change_dean_password(dean_name, dean_id)
     else:
         dean_admin_options()
 
@@ -3237,12 +3361,6 @@ def remove_major():
     elif confirmation == "no":
         view_all_majors("Dean")
 
-
-
-
-
-
-
 # MODIFY MAJOR
 def dean_modify_major(major_name, major_details):
     print()
@@ -3538,6 +3656,57 @@ def change_major_requirements(major_name, major_details):
         dean_admin_options()
 
 
+# DEAN CHANGE PASSWORD
+def change_dean_password(dean_name, dean_id):
+    clear()
+    print("CHANGE DEAN PASSWORD")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    while True:
+        print()
+        pre_password = getpass("Enter Your Previous Password: ")
+        if pre_password != dean_password:
+            print("Passwords Don't Match")
+        else:
+            break
+
+    while True:
+        new_pwd = getpass("Enter Your New Password: ")
+        if new_pwd != '':
+            break
+
+    # CHECKING IF C WAS ENTERED
+    if len(new_pwd) == 1:
+        new_pwd = new_pwd.lower()
+    if new_pwd == "c":
+        DeanMenu(dean_name)
+    new_pwd = sanitize_password(new_pwd, dean_name)
+
+    while True:
+        confirm_new_pwd = getpass("Confirm Your Password: ")
+        if confirm_new_pwd != '':
+            break
+
+    if new_pwd != confirm_new_pwd:
+        confirm_new_pwd = confirm_password_error(dean_name)
+
+    confirm_new_pwd = hash_password(confirm_new_pwd)
+
+    # CHANGE PASSWORD
+    sql = "UPDATE Dean SET password = %s WHERE id = %s"
+    val = (confirm_new_pwd, dean_id)
+
+    db.execute(sql, val)
+    mydb.commit()
+
+    while True:
+        print()
+        back = input("Your Password Has Been Changed. Press (B) To Go Back: ").lower()
+        if back == "b":
+            DeanMenu(dean_name)
 
 
 
@@ -3578,7 +3747,7 @@ def ProfessorMenu(name):
     print("-----------------------")
     print("Press (L) To Log Out")
     print("Press (S) To Send Notification")
-    print("Press (A) To Open Inbox")
+    print("Press (I) To Open Inbox")
     print("-----------------------")
     print()
     print(f"INBOX: {inbox_count}")
@@ -3596,7 +3765,7 @@ def ProfessorMenu(name):
 
     if prof_choice == "l":
         login()
-    elif prof_choice == "a":
+    elif prof_choice == "i":
         professor_inbox()
     elif prof_choice == "s":
         prof_send_notification()
@@ -3651,7 +3820,7 @@ def view_prof_profile():
 
 
 # VIEW ALL COURSES
-def view_all_courses_prof():
+def view_all_courses_prof(came_from=None):
     clear()
     print("----------------")
     print("VIEW ALL COURSES")
@@ -3663,14 +3832,7 @@ def view_all_courses_prof():
     description = db.fetchall()
 
     for i, course in enumerate(all_courses):
-        index = 0
-        # SEPARATE THE FULL COURSE NAME FROM THE DESCRIPTION
-        for j in range(len(description)):
-            if description[i][0][j] == ':':
-                break
-            index += 1
-
-        print(f"{all_courses[i][0]} - {description[i][0][:index]}")
+        print(f"{all_courses[i][0]} - {description[i][0][:indexOf(description[i][0], ':')]}")
         print()
 
     while True:
@@ -3726,7 +3888,7 @@ def view_courses_taught():
             break
 
     # UPDATE COURSES TAUGHT
-    new_courses = sanitize_courses(new_courses)
+    new_courses = sanitize_courses(new_courses, "Prof_Change_Courses_Taught")
 
     while True:
         confirmation = input(f"CONFIRMATION: Are You Sure You Want To Change The Courses You Teach To: {new_courses}? ")
@@ -4086,10 +4248,16 @@ def change_professor_password(prof_name, prof_id):
     print("Press (C) To Cancel")
     print("-------------------")
     print()
-    print(f"CURRENT PASSWORD: {prof_password}")
-    print()
     while True:
-        new_pwd = input("Enter Your New Password: ")
+        print()
+        pre_password = getpass("Enter Your Previous Password: ")
+        if pre_password != prof_password:
+            print("Passwords Don't Match")
+        else:
+            break
+
+    while True:
+        new_pwd = getpass("Enter Your New Password: ")
         if new_pwd != '':
             break
 
@@ -4100,7 +4268,10 @@ def change_professor_password(prof_name, prof_id):
         ProfessorMenu(prof_name)
     new_pwd = sanitize_password(new_pwd, prof_name)
 
-    confirm_new_pwd = input("Confirm Your Password: ")
+    while True:
+        confirm_new_pwd = getpass("Confirm Your Password: ")
+        if confirm_new_pwd != '':
+            break
 
     if new_pwd != confirm_new_pwd:
         confirm_new_pwd = confirm_password_error(prof_name)
@@ -4134,15 +4305,11 @@ def prof_send_notification():
         print()
         to = input("To (Dean, Professor, Or Student): ").capitalize()
         # CHECKING IF C WAS ENTERED
-        if len(to) == 1:
-            to = to.lower()
-        if to == "c":
+        if to.lower() == "c":
             ProfessorMenu(None)
 
         # CHECKING IF A WAS ENTERED
-        if len(to) == 1:
-            to = to.lower()
-        if to == "a":
+        if to.lower() == "a":
             prof_send_announcement()
 
         if to != '' and (to == "Student" or to == "Professor" or to == "Dean"):
@@ -4151,15 +4318,13 @@ def prof_send_notification():
             print("Messages Can Only Be Sent To: Dean, Professor Or Student")
 
 
-
-
-
-
     # STUDENT
     if to == "Student":
         while True:
             print()
             stu_name = capitalize(input("Enter The Name Of The Student: "))
+            if stu_name.lower() == "c":
+                ProfessorMenu(None)
             if stu_name != '':
                 break
         sql = "SELECT id FROM Student WHERE name = %s"
@@ -4167,7 +4332,7 @@ def prof_send_notification():
         db.execute(sql, val)
         stu_id = db.fetchall()
         if len(stu_id) == 0:
-            no_person_found("Notification", "Prof")
+            no_person_found("Notification", "Prof", "Send_To_Stu")
         stu_id = stu_id[0][0]
 
         while True:
@@ -4195,6 +4360,8 @@ def prof_send_notification():
         while True:
             print()
             professor_name = capitalize(input("Enter The Name Of The Professor: "))
+            if professor_name.lower() == "c":
+                ProfessorMenu(None)
             if professor_name != '':
                 break
         sql = "SELECT id FROM Professor WHERE name = %s"
@@ -4202,7 +4369,7 @@ def prof_send_notification():
         db.execute(sql, val)
         prof_id = db.fetchall()
         if len(prof_id) == 0:
-            no_person_found("Notification", "Prof")
+            no_person_found("Notification", "Prof", "Send_To_Prof")
         prof_id = prof_id[0][0]
 
         while True:
@@ -4232,6 +4399,8 @@ def prof_send_notification():
         while True:
             print()
             deanName = capitalize(input("Enter The Name Of The Dean: "))
+            if deanName.lower() == "c":
+                ProfessorMenu(None)
             if deanName != '':
                 break
         # CHECKING IF CORRECT NAME WAS ENTERED
@@ -4240,7 +4409,7 @@ def prof_send_notification():
         db.execute(sql, val)
         result = db.fetchall()
         if len(result) == 0:
-            no_person_found("Notification", "Prof")
+            no_person_found("Notification", "Prof", "Send_To_Dean")
 
         # GETTING THE ID OF THE PROFESSOR
         sql = "SELECT id FROM Professor WHERE name = %s"
@@ -4374,12 +4543,19 @@ def professor_inbox():
 
 
     for i in range(len(all_notifications)):
-        print("-" * len(all_notifications[i][1]) + "---------")
+        # AUTO FIT THE BROKEN LINES
+        max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2])])
+        if max_len_of_attributes == len(all_notifications[i][1]):
+            broken_line_added = "-" * len("Message: ")
+        else:
+            broken_line_added = "-" * len("Received From: ")
+
+        print("-" * max_len_of_attributes + broken_line_added)
         print(f"Id: {all_notifications[i][0]}")
         print(f"Date: {all_notifications[i][3]}")
         print(f"Received From: {all_notifications[i][2]}")
         print(f"Message: {all_notifications[i][1]}")
-        print("-" * len(all_notifications[i][1]) + "---------")
+        print("-" * max_len_of_attributes + broken_line_added)
         print()
 
     while True:
@@ -4581,7 +4757,7 @@ def StudentMenu(name):
     print("------------------------------")
     print("Press (L) To Log Out")
     print("Press (S) To Send Notification")
-    print("Press (A) To Open Inbox")
+    print("Press (I) To Open Inbox")
     print("------------------------------")
     print()
     print(f"INBOX: {inbox_count}")
@@ -4602,7 +4778,7 @@ def StudentMenu(name):
         login()
     elif stu_choice == "s":
         stu_send_notification()
-    elif stu_choice == "a":
+    elif stu_choice == "i":
         student_inbox()
     elif stu_choice == "1":
         view_student_profile()
@@ -4666,11 +4842,17 @@ def change_student_password(stu_name, stu_id):
     print("-------------------")
     print("Press (C) To Cancel")
     print("-------------------")
-    print()
-    print(f"CURRENT PASSWORD: {stu_password}")
-    print()
     while True:
-        new_pwd = input("Enter Your New Password: ")
+        print()
+        pre_password = getpass("Enter Your Previous Password: ")
+        if pre_password != stu_password:
+            print("Passwords Don't Match")
+        else:
+            break
+
+    while True:
+        print()
+        new_pwd = getpass("Enter Your New Password: ")
         if new_pwd != '':
             break
 
@@ -4681,7 +4863,7 @@ def change_student_password(stu_name, stu_id):
         StudentMenu(stu_name)
     new_pwd = sanitize_password(new_pwd, stu_name)
 
-    confirm_new_pwd = input("Confirm Your Password: ")
+    confirm_new_pwd = getpass("Confirm Your Password: ")
 
     if new_pwd != confirm_new_pwd:
         confirm_new_pwd = confirm_password_error(stu_name)
@@ -5020,16 +5202,16 @@ def stu_send_notification():
             print("Messages Can Only Be Sent To: Dean, Professor Or Student")
 
     # CHECKING IF C WAS ENTERED
-    if len(to) == 1:
-        to = to.lower()
-    if to == "c":
-        ProfessorMenu(None)
+    if to.lower() == "c":
+        StudentMenu(None)
 
     # STUDENT
     if to == "Student":
         while True:
             print()
             student_name = capitalize(input("Enter The Name Of The Student: "))
+            if student_name.lower() == "c":
+                StudentMenu(None)
             if student_name != '':
                 break
         sql = "SELECT id FROM Student WHERE name = %s"
@@ -5037,7 +5219,7 @@ def stu_send_notification():
         db.execute(sql, val)
         stu_id = db.fetchall()
         if len(stu_id) == 0:
-            no_person_found("Notification", "Stu")
+            no_person_found("Notification", "Stu", "Send_To_Stu")
         stu_id = stu_id[0][0]
 
         while True:
@@ -5065,6 +5247,8 @@ def stu_send_notification():
         while True:
             print()
             professor_name = capitalize(input("Enter The Name Of The Professor: "))
+            if professor_name.lower() == "c":
+                StudentMenu(None)
             if professor_name != '':
                 break
         sql = "SELECT id FROM Professor WHERE name = %s"
@@ -5072,7 +5256,7 @@ def stu_send_notification():
         db.execute(sql, val)
         prof_id = db.fetchall()
         if len(prof_id) == 0:
-            no_person_found("Notification", "Stu")
+            no_person_found("Notification", "Stu", "Send_To_Prof")
         prof_id = prof_id[0][0]
 
         while True:
@@ -5102,6 +5286,8 @@ def stu_send_notification():
         while True:
             print()
             deanName = capitalize(input("Enter The Name Of The Dean: "))
+            if deanName.lower() == "c":
+                StudentMenu(None)
             if deanName != '':
                 break
         # CHECKING IF CORRECT NAME WAS ENTERED
@@ -5110,7 +5296,7 @@ def stu_send_notification():
         db.execute(sql, val)
         result = db.fetchall()
         if len(result) == 0:
-            no_person_found("Notification", "Stu")
+            no_person_found("Notification", "Stu", "Send_To_Dean")
 
         # GETTING THE ID OF THE STUDENT
         sql = "SELECT id FROM Student WHERE name = %s"
@@ -5318,6 +5504,12 @@ def drop_class(student_id, courses_enrolled_in, name_of_class=None):
     print()
     print(f"CURRENT COURSES ENROLLED IN: {courses_enrolled_in}")
     print()
+    if courses_enrolled_in == None:
+        while True:
+            print()
+            error = input("You Are Not Enrolled In Any Courses. Press (M) To Return To Student Menu: ").lower()
+            if error == "m":
+                StudentMenu(None)
     if name_of_class == None:
         while True:
             class_to_drop = input("Enter The Name Of Class To Drop: ").upper()
@@ -5397,7 +5589,7 @@ def sanitize_password(password, name, came_from=None):
                     break
             if invalid_pwd == "t":
                 while True:
-                    new_password = input(f"Enter {msg} Password: ")
+                    new_password = getpass(f"Enter {msg} Password: ")
                     if new_password != '':
                         break
                 if " " in new_password:
@@ -5419,7 +5611,7 @@ def sanitize_password(password, name, came_from=None):
             if short_pwd == "t":
                 while True:
                     print()
-                    new_password = input(f"Enter {msg} Password: ")
+                    new_password = getpass(f"Enter {msg} Password: ")
                     if new_password != '':
                         break
                 if len(new_password) <= 3:
@@ -5442,7 +5634,7 @@ def sanitize_password(password, name, came_from=None):
             if similar_pwd == "t":
                 while True:
                     print()
-                    new_password = input(f"Enter {msg} Password: ")
+                    new_password = getpass(f"Enter {msg} Password: ")
                     if new_password != '':
                         break
                 if new_password.lower() in name.lower():
@@ -5473,33 +5665,56 @@ def sanitize_phone_number(phone_number, came_from=None):
 
                 return new_phone_number
     return phone_number
-def sanitize_courses(sub_courses, came_from=None):
-    if came_from == None:
-        msg = "You"
-    else:
-        msg = "They"
-
+def sanitize_courses(sub_courses, came_from):
     if not checkCourse(sub_courses):
         print()
-        print(f"AVAILABLE COURSES:")
-        print()
-        print(Course.getAll_Courses()) # TODO
         while True:
-            while True:
-                print()
-                tmp = input("INVALID COURSES. Check To See If All Courses You Entered Are Available. Press (T) To Try Again: ").lower()
-                if tmp != '':
-                    break
-            if tmp == "t":
-                print()
-                new_courses = input(f"Enter The Courses {msg} Teach: ").upper()
+            tmp = input("INVALID COURSES. Press (V) To View All Courses:\n"
+                        "                 Press (T) To Try Again: ").lower()
+            if tmp == "v" or tmp == "t":
+                break
+        if tmp == "v":
+             # PRINT ALL THE COURSES
+            all_courses = Course.getAll_Courses()
+            db.execute("SELECT description FROM Course")
+            description = db.fetchall()
 
-                if not checkCourse(new_courses):
-                    new_courses = sanitize_courses(new_courses)
+            for i, course in enumerate(all_courses):
+                print(f"{all_courses[i][0]} - {description[i][0][:indexOf(description[i][0], ':')]}")
+                print()
 
-                return new_courses
+            return re_enter_courses(came_from)
+
+        elif tmp == "t":
+            return re_enter_courses(came_from)
 
     return sub_courses
+def re_enter_courses(came_from):
+    while True:
+        print()
+        if came_from == "Register_As_Prof":
+            while True:
+                new_courses_taught = input("Enter The Courses You Teach: ").upper()
+                if new_courses_taught != '':
+                    break
+            new_courses_taught = sanitize_courses(new_courses_taught, came_from)
+            return new_courses_taught
+        elif came_from == "Prof_Change_Courses_Taught":
+            while True:
+                new_courses_taught = input("Enter The New Courses You Teach: ").upper()
+                if new_courses_taught != '':
+                    break
+            new_courses_taught = sanitize_courses(new_courses_taught, came_from)
+            return new_courses_taught
+        elif came_from == "Dean_Register_Professor":
+            while True:
+                new_courses_taught = input("Enter Their Courses Taught: ").upper()
+                if new_courses_taught != '':
+                    break
+            new_courses_taught = sanitize_courses(new_courses_taught, came_from)
+            return new_courses_taught
+
+
 def checkCourse(sub_courses):
     counter = 0
     all_courses = Course.getAll_Courses()
@@ -5510,26 +5725,34 @@ def checkCourse(sub_courses):
                 counter += 1
 
     return counter == len(sub_courses)
-def age_not_num(came_from=None):
-    if came_from == None:
-        msg = "Your"
-    else:
-        msg = "Their"
+def checkAge(age):
+    return age.isdigit()
+
+
+def view_all_course_general(came_from, args=None):
+    clear()
+    print("----------------")
+    print("VIEW ALL COURSES")
+    print("----------------")
+    print()
+    all_courses = Course.getAll_Courses()
+    db.execute("SELECT description FROM Course")
+
+    description = db.fetchall()
+
+    for i, course in enumerate(all_courses):
+        print(f"{all_courses[i][0]} - {description[i][0][:indexOf(description[i][0], ':')]}")
+        print()
+
     while True:
-        while True:
-            print()
-            tmp = input(f"Invalid Input. {msg} Age Must Be A Number. Press (T) To Try Again: ").lower()
-            if tmp != '':
+        user_choice = input("Press (B) To Go Back: ").lower()
+        if user_choice == "b":
+            if came_from == "Dean_Update_Student_Courses":
+                update_student(args[0], args[1], args[2])
                 break
-        if tmp == "t":
-            try:
-                print()
-                new_age = int(input(f"Enter {msg} Age: "))
-
-            except ValueError:
-                new_age = age_not_num()
-
-            return new_age
+            elif came_from == "Dean_Update_Prof_Courses_Taught":
+                update_professor(args[0], args[1], args[2])
+                break
 
 
 # CONFIRM PASSWORD ERROR
@@ -5547,11 +5770,11 @@ def confirm_password_error(name, came_from=None):
         if tmp == "t":
             print()
             while True:
-                password = input(f"Enter {msg} Password: ")
+                password = getpass(f"Enter {msg} Password: ")
                 if password != '':
                     break
             password = sanitize_password(password, name)
-            confirm_password = input(f"Confirm {msg} Password: ")
+            confirm_password = getpass(f"Confirm {msg} Password: ")
             if password != confirm_password:
                 confirm_password = confirm_password_error(name)
 
