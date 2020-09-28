@@ -58,10 +58,12 @@ def login():
             exit()
 
 
+password_attempts = 1
+MAX_PASSWORD_ATTEMPTS = 3
 # DEAN LOGIN
 def DeanLogin():
     clear()
-    global dean_name, dean_password
+    global dean_name, dean_password, password_attempts
     print("LOGIN AS DEAN")
     print(now)
     print("-------------------")
@@ -87,6 +89,9 @@ def DeanLogin():
     dean_password = getpass("Enter Your Password: ")
     # CHECKING IF THE PASSWORD MATCHES
     if not check_password_hash(dean_password, hashed_password):
+        if password_attempts == MAX_PASSWORD_ATTEMPTS:
+            reset_password("Dean")
+        password_attempts += 1
         incorrect_password("Dean")
 
     update_course_database()
@@ -96,7 +101,7 @@ def DeanLogin():
 
 # PROFESSOR LOGIN
 def ProfessorLogin():
-    global prof_password, prof_name
+    global prof_password, prof_name, password_attempts
     clear()
     print("LOGIN AS PROFESSOR")
     print(now)
@@ -124,6 +129,9 @@ def ProfessorLogin():
     prof_password = getpass("Enter Your Password: ")
     # CHECKING IF THE PASSWORD MATCHES
     if not check_password_hash(prof_password, hashed_password):
+        if password_attempts == MAX_PASSWORD_ATTEMPTS:
+            reset_password("Prof")
+        password_attempts += 1
         incorrect_password("Professor")
 
     update_course_database()
@@ -135,7 +143,7 @@ def ProfessorLogin():
 # STUDENT LOGIN
 def StudentLogin():
     clear()
-    global stu_name, stu_password
+    global stu_name, stu_password, password_attempts
     print("LOGIN AS STUDENT")
     print(now)
     print("-------------------")
@@ -161,6 +169,9 @@ def StudentLogin():
     stu_password = getpass("Enter Your Password: ")
     # CHECKING IF THE PASSWORD MATCHES
     if not check_password_hash(stu_password, hashed_password):
+        if password_attempts == MAX_PASSWORD_ATTEMPTS:
+            reset_password("Stu")
+        password_attempts += 1
         incorrect_password("Student")
 
     update_course_database()
@@ -3796,9 +3807,19 @@ def view_prof_profile():
         sleep(2.5)
         exit()
 
-    print("<" * (len(Prof.getAddress()) // 2), "PROFILE", ">" * (len(Prof.getAddress()) // 2 + 1))
+    # AUTO FIT HEADINGS
+    addressLen = len(Prof.getAddress()) + len("Address: ")
+    coursesLen = Prof.getLenCoursesTaught()
+    max_len_of_attributes = max([addressLen, coursesLen])
 
-    print("-" * len(Prof.getAddress()) + "---------")
+    # print(f"Len Address: {addressLen}")
+    # print(f"Len Courses: {coursesLen}")
+
+    # print("<" * (max_len_of_attributes // 2), "PROFILE", ">" * (max_len_of_attributes // 2 + 1))
+
+    print("<" * (max_len_of_attributes // 2 - 5) + " PROFILE " + ">" * (max_len_of_attributes // 2 - 4))
+
+    print("-" * max_len_of_attributes)
     print()
     print(f"Id: {Prof.getID()}")
     print(f"Name: {Prof.getFullName()}")
@@ -3809,7 +3830,7 @@ def view_prof_profile():
     print(f"Salary: {Prof.getSalary()}")
     print(f"Courses Taught: {Prof.getCoursesTaught()}")
     print()
-    print("-" * len(Prof.getAddress()) + "---------")
+    print("-" * max_len_of_attributes)
     print()
     while True:
         back = input("Press (C) To Change Your Password:\nPress (M) To Return To Professor Menu: ").lower()
@@ -4806,6 +4827,9 @@ def view_student_profile():
         sleep(2.5)
         exit()
 
+
+
+
     print("<" * (len(Stu.getAddress()) // 2), "PROFILE", ">" * (len(Stu.getAddress()) // 2 + 1))
 
     print("-" * len(Stu.getAddress()) + "---------")
@@ -4816,8 +4840,8 @@ def view_student_profile():
     print(f"Email: {Stu.getEmail()}")
     print(f"Age: {Stu.getAge()}")
     print(f"Phone Number: {Stu.getPhoneNumber()}")
-    print(f"Courses Enrolled In: {Stu.getCoursesEnrolledIn()}")
-    print(f"Grades: {Stu.getGrades()}")
+    print(f"Courses Enrolled In: {Stu.getCoursesEnrolledIn().split() if result[6] != None else Stu.getCoursesEnrolledIn()}")
+    print(f"Grades: ", [Stu.getGrades().split()[i+i] + " " + Stu.getGrades().split()[i+i+1] for i in range(len(Stu.getGrades().split()) // 2)] if result[7] != None else Stu.getGrades())
     print(f"GPA: {Stu.getGPA()}")
     print(f"Major: {Stu.getMajor()}")
     print("-" * len(Stu.getAddress()) + "---------")
@@ -5804,6 +5828,115 @@ def indexOf(string, index_of):
     for i in range(len(string)):
         if string[i] == index_of:
             return i
+
+
+def reset_password(came_from):
+    global password_attempts
+    if came_from == "Dean":
+        Table = "Dean"
+        user_name = dean_name
+        menuToReturn = DeanMenu
+        loginToReturn = DeanLogin
+    elif came_from == "Prof":
+        Table = "Professor"
+        user_name = prof_name
+        menuToReturn = ProfessorMenu
+        loginToReturn = ProfessorLogin
+    elif came_from == "Stu":
+        Table = "Student"
+        user_name = stu_name
+        menuToReturn = StudentMenu
+        loginToReturn = StudentLogin
+    else:
+        return
+    # GET THE USERS NAME AND SECURITY ANIMAL
+    sql = f"SELECT security_animal FROM {Table} WHERE name = %s"
+    val = (user_name, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    # NO SECURITY ANIMAL WAS FOUND
+    if len(results) == 0:
+        no_security_animal(came_from)
+    user_security_animal = results[0][0]
+
+
+    while True:
+        print()
+        error = input(f"You Entered Your Password Incorrect {password_attempts} Times. Would You Like To Reset Your Password? ").lower()
+        if error == "yes" or error == "no":
+            break
+    if error == "yes":
+        while True:
+            print()
+            entered_s_animal = input("SECURITY QUESTION: What Is The Name Of Your Favorite Animal? ").lower()
+            if entered_s_animal != user_security_animal:
+                print("Security Question Doesn't Match. Press (C) To Cancel")
+                if entered_s_animal == "c":
+                    loginToReturn()
+            else:
+                break
+        # NEW PASSWORD
+        while True:
+            print()
+            new_password = getpass("Enter Your New Password: ")
+            if new_password != '':
+                break
+        new_password = sanitize_password(new_password, user_name)
+        # CONFIRM PASSWORD
+        while True:
+            print()
+            confirm_user_password = getpass("Confirm Your Password: ")
+            if confirm_user_password != '':
+                break
+        if confirm_user_password != new_password:
+            confirm_user_password = confirm_password_error(user_name)
+
+        # HASH PASSWORD
+        confirm_user_password = hash_password(confirm_user_password)
+
+        # CONFIRMATION
+        while True:
+            print()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Reset Your Password? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            sql = f"UPDATE {Table} SET password = %s WHERE name = %s"
+            val = (confirm_user_password, user_name)
+            db.execute(sql, val)
+            mydb.commit()
+
+            # BACK
+            while True:
+                print()
+                back = input("Your Password Has Been Reset. Press (R) To Re-Login: ").lower()
+                if back == "r":
+                    loginToReturn()
+        elif confirmation == "no":
+            loginToReturn()
+
+    elif error == "no":
+        loginToReturn()
+
+
+def no_security_animal(came_from):
+    while True:
+        print()
+        error = input("You Have Not Entered Your Security Animal So Your Password Cannot Be Reset. Press (L) To Return To Login: ").lower()
+        if error == "l":
+            if came_from == "Dean":
+                DeanLogin()
+                break
+            elif came_from == "Prof":
+                ProfessorLogin()
+                break
+            elif came_from == "Stu":
+                StudentLogin()
+                break
+
+
+
+
 
 # UPDATE COURSE DATABASE
 def update_course_database():

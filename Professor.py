@@ -33,6 +33,14 @@ class Professor(Person):
     def getCoursesTaught(self):
         return self.__coursesTaught.split()
 
+    # SPECIAL USE
+    def getLenCoursesTaught(self):
+        all_courses = ""
+        for course in self.getCoursesTaught():
+            all_courses += course
+            all_courses += " "
+        all_courses = all_courses.rstrip()
+        return len(all_courses) + (len(self.getCoursesTaught()) - 1) + len("Courses Taught: ") + 10
     # STATIC METHODS
     @staticmethod
     def checkIfCourseIsAvailableToSet(all_courses, subset_courses):
@@ -90,14 +98,6 @@ class Professor(Person):
             salary = salary[:index]
 
         self.__salary = int(salary)
-
-
-
-
-
-
-
-
 
     # REGULAR METHODS
     def shouldGetBonus(self):
