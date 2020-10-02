@@ -1398,9 +1398,16 @@ def select_course_dean(course_name):
     print()
     print()
 
-    print("-" * len(course) + "------------------")
-    print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
-    print(f"Class Size: {course.getStudentCountInCourse()}")
+    try:
+        print("-" * len(course) + "------------------")
+        print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
+        print(f"Class Size: {course.getStudentCountInCourse()}")
+        print()
+    except:
+        print()
+        print("An Error Occurred. Restart Application")
+        sleep(1)
+        exit()
     if course.getStudentCountInCourse() > 0:
         # COMPUTE THE CLASS AVERAGE
         all_grades = []
@@ -2920,10 +2927,13 @@ def add_new_course():
 
         # ADD THE COURSE TO THE DATABASE
         full_description = new_course_long_name + " " + new_course_description
-        sql = "INSERT INTO Course (name, description) VALUES (%s, %s)"
-        val = (new_course_number, full_description)
-        db.execute(sql, val)
-        mydb.commit()
+        try:
+            sql = "INSERT INTO Course (name, description) VALUES (%s, %s)"
+            val = (new_course_number, full_description)
+            db.execute(sql, val)
+            mydb.commit()
+        except mysql.connector.errors.DataError:
+            course_description_too_long()
 
         update_course_database()
 
@@ -2945,7 +2955,7 @@ def add_new_course():
         print(f"{new_course_number} Has Been Added")
         print("-" * len(new_course_number) + "---------------")
         print()
-        print("Application Needs To Be Restarted To View New Course")
+        print("Application Needs To Be Restarted To View New Courses")
         print()
         print(f"{full_description}")
         while True:
@@ -2977,6 +2987,16 @@ def check_course_num_format(course_number):
 
         return new_course_num
     return course_number
+def course_description_too_long():
+    while True:
+        print()
+        error = input("The Description Of That Course Is Too Long. Press (T) To Try Again:\n"
+                      "                                            Press (A) To Return To Admin Options: ").lower()
+        if error == "t":
+            add_new_course()
+            break
+        elif error == "a":
+            dean_admin_options()
 # DEAN EDIT COURSE
 def edit_course(courseName=None, courseDescriptionOrName=None):
     clear()
@@ -2995,9 +3015,7 @@ def edit_course(courseName=None, courseDescriptionOrName=None):
     else:
         course_name = courseName
     # CHECK IF C WAS ENTERED
-    if len(course_name) == 1:
-        course_name = course_name.lower()
-    if course_name == "c":
+    if course_name.lower() == "c":
         dean_admin_options()
 
     # CHECKING IF THE COURSE ENTERED IS AVAILABLE
@@ -3029,8 +3047,8 @@ def edit_course(courseName=None, courseDescriptionOrName=None):
     if edit_to_make == "name":
         while True:
             print()
-            new_course_name = input("Enter The New Name Of The Course: ").upper()
-            if new_course_name != '':
+            new_course_number = input("Enter The New Name Of The Course: ").upper()
+            if new_course_number != '':
                 break
 
 
@@ -3041,12 +3059,12 @@ def edit_course(courseName=None, courseDescriptionOrName=None):
                 break
         if confirmation == "yes":
             sql = "UPDATE Course SET name = %s WHERE name = %s"
-            val = (new_course_name, course_name)
+            val = (new_course_number, course_name)
             db.execute(sql, val)
             mydb.commit()
 
             # SET UP NOTIFICATION
-            notification = f"{course_name} Name Has Been Changed To - {new_course_name}"
+            notification = f"{course_name} Name Has Been Changed To - {new_course_number}"
             received_from = f"Dean ({dean_name})"
             sql = "SELECT id FROM Dean WHERE name = %s"
             val = (dean_name,)
@@ -3620,7 +3638,10 @@ def change_major_requirements(major_name, major_details):
     print(f"MAJOR REQUIREMENTS: {major_requirements}")
     while True:
         print()
-        new_major_requirements = input("New Major Requirements: ")
+        new_major_requirements = input("New Major Requirements: ").upper()
+        if new_major_requirements.lower() == "c":
+            view_all_majors("Dean")
+            break
         if not checkCourse(new_major_requirements):
             print("One Of The Courses Entered Is Invalid. Please Check The Spelling Of All Courses Entered")
         if checkCourse(new_major_requirements):
@@ -3938,11 +3959,12 @@ def view_courses_taught():
 
 # COURSE NOT FOUND
 def course_not_found(came_from=None, argv=None):
+
     print()
     while True:
         print()
         error = input("That Course Was Not Found. Press (T) To Try Again:\n"
-                      "                           Press (M) To Return To Professor Menu: ").lower()
+                      "                           Press (B) To Go Back: ").lower()
         if error == "t":
             if came_from == "Edit_Course":
                 edit_course()
@@ -3954,13 +3976,13 @@ def course_not_found(came_from=None, argv=None):
                 search_for_course_prof()
             elif came_from == "Dean Remove Course":
                 remove_course()
-        elif error == "m":
+        elif error == "b":
             if came_from == "Edit_Course":
                 DeanMenu(None)
             elif came_from == "Student Search For Course":
                 StudentMenu(None)
             elif came_from == "Dean Search For Course":
-                DeanMenu(None)
+                dean_admin_options()
             elif came_from == "Prof Search For Course":
                 ProfessorMenu(None)
             elif came_from == "Dean Remove Course":
@@ -3980,12 +4002,16 @@ def select_course_prof(course_name):
     print()
     print(course.getDescription())
     print()
-    print()
 
-    print("-" * len(course) + "------------------")
-    print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
-    print("-" * len(course) + "------------------")
-    print()
+    try:
+        print("-" * len(course) + "------------------")
+        print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
+        print("-" * len(course) + "------------------")
+        print()
+    except:
+        print("An Error Occurred. Restart Application")
+        sleep(1)
+        exit()
     # GET THE NAMES OF THE STUDENTS ENROLLED
     names = course.getStudentNamesInCourse()
     if names != None:
@@ -5414,16 +5440,21 @@ def select_course_stu(course_name):
     print("<<<<<<<<<<<<<<<< DESCRIPTION >>>>>>>>>>>>>>>>")
     print()
     print(course.getDescription())
-    print()
-    print()
 
-    print("-" * len(course) + "------------------")
-    print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
-    print(f"Class Size: {course.getStudentCountInCourse()}")
-    print("-" * len(course) + "------------------")
-    print()
 
+    try:
+        print("-" * len(course) + "------------------")
+        print(f"COURSE CANCELLED: {course.isCourseCancelled()}")
+        print(f"Class Size: {course.getStudentCountInCourse()}")
+        print("-" * len(course) + "------------------")
+        print()
+    except:
+        print()
+        print("An Error Occurred. Restart Application")
+        sleep(1)
+        exit()
     while True:
+        print()
         print("Press (S) To Search Again:")
         print("Press (E) To Enroll In This Course:")  # TODO ONLY MAKE THIS AVAILABLE IF COURSE IS NOT CANCELLED
         print("Press (D) To Drop This Course:")   # TODO ONLY MAKE THIS OPTION AVAILABLE IF THE STUDENT IS ENROLLED IN THE COURSE
