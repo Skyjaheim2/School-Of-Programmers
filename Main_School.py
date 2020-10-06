@@ -3038,19 +3038,25 @@ def edit_course(courseName=None, courseDescriptionOrName=None):
     if courseDescriptionOrName == None:
         while True:
             print()
-            edit_to_make = input("Would You Like To Edit The Name Of The Course Or The Description? ").lower()
-            if edit_to_make != '' and (edit_to_make == "name" or edit_to_make == "description"):
+            print("AVAILABLE CHANGES")
+            print()
+            print("1 -> Edit Course Number: ")
+            print("2 -> Edit Course Description: ")
+            print()
+            edit_to_make = input("Choose An Option: ").lower()
+            if edit_to_make == "1" or edit_to_make == "2" or edit_to_make == "3":
                 break
     else:
         edit_to_make = courseDescriptionOrName
 
-    if edit_to_make == "name":
+    if edit_to_make == "1":
         while True:
             print()
-            new_course_number = input("Enter The New Name Of The Course: ").upper()
-            if new_course_number != '':
+            new_course_number = input("Enter The New Course Number: ").upper()
+            if "-" not in new_course_number:
+                print("Invalid Course Number")
+            else:
                 break
-
 
         # CONFIRMATION
         while True:
@@ -3090,7 +3096,7 @@ def edit_course(courseName=None, courseDescriptionOrName=None):
         elif confirmation == "no":
             dean_admin_options()
 
-    elif edit_to_make == "description":
+    elif edit_to_make == "2":
         while True:
             print()
             new_course_description = input("Enter The New Description Of The Course: ")
@@ -3963,8 +3969,13 @@ def course_not_found(came_from=None, argv=None):
     print()
     while True:
         print()
-        error = input("That Course Was Not Found. Press (T) To Try Again:\n"
-                      "                           Press (B) To Go Back: ").lower()
+        if came_from != "Dean Search For Course":
+            error = input("That Course Was Not Found. Press (T) To Try Again:\n"
+                          "                           Press (B) To Go Back: ").lower()
+        else:
+            error = input("That Course Was Not Found. Press (T) To Try Again:\n"
+                          "                           Press (A) To Add Course:\n"
+                          "                           Press (B) To Go Back: ").lower()
         if error == "t":
             if came_from == "Edit_Course":
                 edit_course()
@@ -3987,7 +3998,8 @@ def course_not_found(came_from=None, argv=None):
                 ProfessorMenu(None)
             elif came_from == "Dean Remove Course":
                 dean_admin_options()
-
+        elif error == "a" and came_from == "Dean Search For Course":
+            add_new_course()
 
 # SELECT COURSE
 def select_course_prof(course_name):
