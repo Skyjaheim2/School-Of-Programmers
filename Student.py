@@ -38,6 +38,7 @@ class Student(Person):
         if self.__grades == None:
             return None
         grades = self.__grades.split()
+        # print(grades)
 
         grades_to_return = ""
         for grade in grades:
@@ -64,17 +65,6 @@ class Student(Person):
         grades_to_return = grades_to_return.rstrip()
         return grades_to_return
 
-
-        # current_courses = self.getCoursesEnrolledIn().split()
-        # grades = self.getGradesForAverage()
-        # if grades == None or current_courses == None:
-        #     return None
-        # grades_to_return = ""
-        #
-        # for i in range(len(grades)):
-        #     grades_to_return += current_courses[i] + ":" + " " + grades[i] + "%" + " "
-        #
-        # return grades_to_return.rstrip()
 
 
     def getMajor(self):
@@ -173,18 +163,9 @@ class Student(Person):
     # GETTER METHODS
     def getAverageOfGrades(self):
         all_grades = self.getGradesForAverage()
-        if all_grades == None:
-            return None
-        max_num = 0
-        for i in range(len(all_grades)):
-            all_grades[i] = int(all_grades[i])
-            max_num += all_grades[i]
+        return int(all_grades[-1])
 
-        return round(max_num / len(all_grades))
 
-    # TODO - Turn this into a function that returns the letter grade for a particular course
-    def getLetterGrade(self):
-        grade = self.getAverageOfGrades()
 
 
     def getGPA(self):

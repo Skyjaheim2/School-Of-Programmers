@@ -7,6 +7,7 @@ try:
     import mysql.connector
 except ImportError:
     print("Import Error: Do pip install mysql.connector-python To Use This Program")
+    exit()
 from datetime import date
 
 current_date = date.today()
@@ -212,7 +213,6 @@ def not_registered(came_from):
 
         elif tmp == "r":
             register()
-
 
 
 
@@ -593,6 +593,7 @@ def already_registered(came_from=None):
 # DEAN MENU
 def DeanMenu(name):
     clear()
+    update_student_grades()
     # GETTING INBOX COUNT
     sql = "SELECT COUNT(*) FROM dean_notification"
     db.execute(sql)
@@ -1867,12 +1868,16 @@ def dean_inbox():
 
     while True:
         print()
+        print("Press (O) To Open A Notification:")
+        print()
         print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
         print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
         print("Press (M) To Filter By Message:           |  Press (S) To Return To Dean Menu:")
         print()
         filter = input("Choose An Option: ")
-        if filter == "d":
+        if filter == "o":
+            open_dean_notification(all_notifications)
+        elif filter == "d":
             filter_dean_notification_by_date(all_notifications)
         elif filter == "f":
             filter_dean_notification_by_received_from(all_notifications)
@@ -1885,6 +1890,60 @@ def dean_inbox():
         elif filter == "s":
             DeanMenu(None)
 
+
+
+# DEAN OPEN NOTIFICATION
+def open_dean_notification(notification):
+    all_possible_id = [str(notification[i][0]) for i in range(len(notification))]
+    print()
+    while True:
+        noti_id = input("Enter The Id Of The Notification: ")
+        if noti_id not in all_possible_id:
+            print("Invalid Id")
+        else:
+            break
+    sql = "SELECT id, notification, received_from, date FROM dean_notification WHERE id = %s"
+    val = (int(noti_id),)
+    db.execute(sql, val)
+    notification_to_open = db.fetchall()
+    clear()
+    # AUTO FIT THE BROKEN LINES
+    max_len_of_attributes = max([len(notification_to_open[0][1]), len(notification_to_open[0][2])])
+    if max_len_of_attributes == len(notification_to_open[0][1]):
+        broken_line_added = "-" * len("Message: ")
+    else:
+        broken_line_added = "-" * len("Received From: ")
+
+    message = notification_to_open[0][1]
+    received_from = notification_to_open[0][2]
+    print("-" * max_len_of_attributes + broken_line_added)
+    print(f"Id: {notification_to_open[0][0]}")
+    print(f"Date: {notification_to_open[0][3]}")
+    print(f"Received From: {notification_to_open[0][2]}")
+    print(f"Message: {notification_to_open[0][1]}")
+    print("-" * max_len_of_attributes + broken_line_added)
+    print()
+
+    print("Press (R) To Respond:")
+    while True:
+        back = input("Press (B) To Go Back: ").lower()
+        # RESPONSE
+        if back == "r":
+            receiverName = extractNameFromNotification(received_from)["receiverName"]
+            receiverType = extractNameFromNotification(received_from)["Type"]
+            if receiverName == None:
+                while True:
+                    print()
+                    error = input("Unable To Respond: Please Contact The Admin. Press (B) To Go Back: ").lower()
+                    if error == "b":
+                        dean_inbox()
+                        break
+            else:
+                respondToNotification(dean_name, "Dean", receiverType, receiverName, message)
+
+        elif back == "b":
+            dean_inbox()
+            break
 # FILTER DEAN NOTIFICATIONS
 def filter_dean_notification_by_date(notifications):
     while True:
@@ -3772,6 +3831,7 @@ def checkMajor(major_name):
 # PROFESSOR MENU
 def ProfessorMenu(name):
     clear()
+    update_student_grades()
     # GETTING INBOX COUNT
     Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
     sql = "SELECT COUNT(*) FROM professor_notification WHERE prof_id = %s"
@@ -3795,12 +3855,13 @@ def ProfessorMenu(name):
     print("1 - View Profile")
     print("2 - View All Courses")
     print("3 - View Courses Taught")
+    print("4 - Create Assignment")
+    print("5 - Issue Assignment")
     print()
     while True:
         prof_choice = input("Choose An Option: ").lower()
         if prof_choice != '':
             break
-
     if prof_choice == "l":
         login()
     elif prof_choice == "i":
@@ -3813,7 +3874,12 @@ def ProfessorMenu(name):
         view_all_courses_prof()
     elif prof_choice == "3":
         view_courses_taught()
-
+    elif prof_choice == "4":
+        prof_create_assignment()
+    elif prof_choice == "5":
+        prof_issue_assignment()
+    else:
+        ProfessorMenu(None)
 # VIEW PROFESSOR PROFILE
 def view_prof_profile():
     clear()
@@ -4028,7 +4094,7 @@ def select_course_prof(course_name):
     names = course.getStudentNamesInCourse()
     if names != None:
         names = names.split()
-        students_in_course = [names[i] + " " + names[i+1] for i in range(len(names) // 2)]
+        students_in_course = [names[i+i] + " " + names[i+i+1] for i in range(len(names) // 2)]
     else:
         students_in_course = None
 
@@ -4038,30 +4104,7 @@ def select_course_prof(course_name):
         # GET THE STUDENT COUNT
         print(f"Number Of Students Enrolled: {course.getStudentCountInCourse()}")
         # COMPUTE THE CLASS AVERAGE
-        all_grades = []
-        all_names  = course.getStudentNamesInCourse().split()
-        for i in range(course.getStudentCountInCourse()):
-            # GETTING STUDENTS INFO
-            sql = "SELECT CoursesEnrolledIn, grades FROM Student WHERE name = %s"
-            val = (all_names[i+i] + " " + all_names[i+i+1], )
-            db.execute(sql, val)
-            result = db.fetchall()
-
-            grades_for_course = {}
-            grades_from_db = result[0][1].split()
-
-            for grade in grades_from_db:
-                # GENERATE DICTIONARY OF GRADES
-                if ':' in grade:
-                    grade_key = grade.replace(':', '')
-                if grade.replace("%", '').isnumeric():
-                    grade_value = grade.replace('%', '')
-
-                    grades_for_course.update({grade_key: grade_value})
-
-            all_grades.append(int(grades_for_course[course_name]))
-        # COMPUTING THE AVERAGE GRADE FOR THE COURSE
-        average = round(sum(all_grades) / len(all_grades))
+        average = get_class_average(course_name)
         print(f"Class Average: {average}%")
         print()
 
@@ -4079,7 +4122,7 @@ def select_course_prof(course_name):
             elif back == "d":
                 drop_student_from_course(course_name)
             elif back == "v":
-                view_student_grade_for_course(all_names, course.getStudentCountInCourse(), course_name)
+                view_student_grade_for_course(course_name)
             elif back == "m":
                 ProfessorMenu(None)
 
@@ -4098,6 +4141,41 @@ def select_course_prof(course_name):
         elif back == "m":
             ProfessorMenu(None)
 
+
+def get_class_average(course_name):
+    sql = "SELECT * FROM grade_book WHERE course_name = %s"
+    val = (course_name,)
+    db.execute(sql, val)
+    results = db.fetchall()
+
+    grade_book = {}
+
+    for i in range(len(results)):
+        sql = "SELECT name FROM Student WHERE id = %s"
+        val = (results[i][1],)
+        db.execute(sql, val)
+        all_names = db.fetchall()[0][0]
+        # ADD STUDENT NAMES AND THEIR CORRESPONDING GRADES FROM THE GRADE BOOK
+        grade_book.update({all_names: results[i][3:]})
+
+    student_grade_book_averages = []
+    for grades in grade_book:
+        grades_to_average = [grade_book[grades][i] for i in range(len(grade_book[grades])) if
+                             grade_book[grades][i] != None]
+        student_grade_book_averages.append(compute_average(grades_to_average))
+
+    class_average = round(sum(student_grade_book_averages) / len(student_grade_book_averages))
+
+    return class_average
+
+
+def compute_average(items: list):
+    sum = 0
+    for item in items:
+        sum += int(item.replace('%', ''))
+    average = round(sum / len(items))
+
+    return average
 # ADD COURSE TO LIST OF COURSES TEACHED
 def add_course_to_list_of_courses_teached(course_name):
     clear()
@@ -4261,26 +4339,35 @@ def drop_student_from_course(course_name):
     else:
         view_all_courses_prof()
 # VIEW STUDENT GRADE FOR COURSE
-def view_student_grade_for_course(students_in_course, num_students_in_course, course_name, came_from=None):
+def view_student_grade_for_course(course_name, came_from=None):
     clear()
     print("-------------------")
     print("VIEW STUDENT GRADES")
     print("-------------------")
     print()
-    grades_for_course = {}
-    for i in range(num_students_in_course):
-        # GETTING STUDENTS INFO
-        sql = "SELECT name, grades FROM Student WHERE name = %s"
-        val = (students_in_course[i+i] + " " + students_in_course[i+i+1],)
-        db.execute(sql, val)
-        result = db.fetchall()
-        for j, grade  in enumerate(result[0][1].split()):
-            if grade.replace(':', '') == course_name:
-                grades_for_course.update({result[0][0].split()[0] + " " + result[0][0].split()[1]: result[0][1].split()[j+1]})
+    sql = "SELECT * FROM grade_book WHERE course_name = %s"
+    val = (course_name,)
+    db.execute(sql, val)
+    results = db.fetchall()
 
-    # PRINT THE DICTIONARY
-    for key in grades_for_course:
-        print(f"{key}: {grades_for_course[key]}")
+    grade_book = {}
+
+    for i in range(len(results)):
+        sql = "SELECT name FROM Student WHERE id = %s"
+        val = (results[i][1],)
+        db.execute(sql, val)
+        all_names = db.fetchall()[0][0]
+
+        grade_book.update({all_names: results[i][3:]})
+
+    print()
+    for grade in grade_book:
+        print(f"{grade}: |GRADE-1|GRADE-2|GRADE-3|GRADE-4|GRADE-5|AVG|")
+        # CHANGE THE TUPLE OF GRADES TO A LIST
+        grades  = [grade_book[grade][i] for i in range(len(grade_book[grade]))]
+        stu_avg = round(sum([int(grade.replace('%','')) for grade in grades if grade != None]) / len([grade for grade in grades if grade != None]))
+        print(f" " * (len(grade) +2)+ f"{grades} {stu_avg}%")
+        print()
 
     while True:
         print()
@@ -4499,88 +4586,101 @@ def prof_send_notification():
                 break
 
 # PROF SEND ANNOUNCEMENT
-def prof_send_announcement():
-    clear()
-    # GET THE COURSES BEING TAUGHT
-    sql = "SELECT CoursesTaught FROM Professor WHERE name = %s"
-    val = (prof_name, )
-    db.execute(sql, val)
-    courses_taught = db.fetchall()[0][0]
-    print("SEND ANNOUNCEMENT")
-    print(now)
-    print("-------------------")
-    print("Press (C) To Cancel")
-    print("-------------------")
-    print()
-    print(f"Courses You Are Currently Teaching: {courses_taught.split()}")
-    while True:
+def prof_send_announcement(announcement_to_send=None, course_name=None):
+    if announcement_to_send == None:
+        clear()
+        # GET THE COURSES BEING TAUGHT
+        sql = "SELECT CoursesTaught FROM Professor WHERE name = %s"
+        val = (prof_name, )
+        db.execute(sql, val)
+        courses_taught = db.fetchall()[0][0]
+        print("SEND ANNOUNCEMENT")
+        print(now)
+        print("-------------------")
+        print("Press (C) To Cancel")
+        print("-------------------")
         print()
-        prof_choice = input("Enter The Name Of The Course You Want To Send An Announcement To: ").upper()
-        if prof_choice != '':
-            break
-    # CHECKING IF C WAS ENTERED
-    if len(prof_choice) == 1:
-        prof_choice = prof_choice.lower()
-    if prof_choice == "c":
-        ProfessorMenu(None)
-
-    # CHECK IF THE CORRECT COURSE WAS ENTERED
-    if prof_choice not in courses_taught.split():
+        print(f"Courses You Are Currently Teaching: {courses_taught.split()}")
         while True:
             print()
-            error = input("You Are Not Teaching That Course. Press (T) To Try Again:\n"
-                          "                                  Press (M) To Return To Professor Menu: ").lower()
-            if error == "t":
-                prof_send_announcement()
-            elif error == "m":
-                ProfessorMenu(None)
+            prof_choice = input("Enter The Name Of The Course You Want To Send An Announcement To: ").upper()
+            if prof_choice != '':
+                break
+        # CHECKING IF C WAS ENTERED
+        if len(prof_choice) == 1:
+            prof_choice = prof_choice.lower()
+        if prof_choice == "c":
+            ProfessorMenu(None)
+
+        # CHECK IF THE CORRECT COURSE WAS ENTERED
+        if prof_choice not in courses_taught.split():
+            while True:
+                print()
+                error = input("You Are Not Teaching That Course. Press (T) To Try Again:\n"
+                              "                                  Press (M) To Return To Professor Menu: ").lower()
+                if error == "t":
+                    prof_send_announcement()
+                elif error == "m":
+                    ProfessorMenu(None)
 
 
-    # THE ANNOUNCEMENT
-    while True:
-        print()
-        announcement = input("Enter the Announcement: ")
-        if announcement != '':
-            break
+        # THE ANNOUNCEMENT
+        while True:
+            print()
+            announcement = input("Enter the Announcement: ")
+            if announcement != '':
+                break
 
-    # CONFIRMATION
-    while True:
-        confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Announcement? ")
-        if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
-            break
+        # CONFIRMATION
+        while True:
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Announcement? ")
+            if confirmation != '' and (confirmation == "yes" or confirmation == "no"):
+                break
 
 
-    if confirmation == "yes":
+        if confirmation == "yes":
+            # GET THE STUDENTS ID
+            like_query = f"%{prof_choice}%"
+            sql = "SELECT id FROM Student WHERE CoursesEnrolledIn LIKE %s"
+            val = (like_query, )
+            db.execute(sql, val)
+            all_id = db.fetchall()
+
+            for i in range(len(all_id)):
+                sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+                val = (announcement, f"Professor ({prof_name}) [{prof_choice}]", now, all_id[i][0])
+                db.execute(sql, val)
+                mydb.commit()
+
+
+            while True:
+                print()
+                back = input("Announcement Sent. Press (S) To Send Another:\n"
+                             "                   Press (M) To Return To Professor Menu: ").lower()
+                if back == "s":
+                    prof_send_announcement()
+                elif back == "m":
+                    ProfessorMenu(None)
+
+        elif confirmation == "no":
+            prof_send_announcement()
+
+    elif announcement_to_send != None:
+        if course_name == None:
+            return
+        announcement = announcement_to_send
         # GET THE STUDENTS ID
-        like_query = f"%{prof_choice}%"
+        like_query = f"%{course_name}%"
         sql = "SELECT id FROM Student WHERE CoursesEnrolledIn LIKE %s"
-        val = (like_query, )
+        val = (like_query,)
         db.execute(sql, val)
         all_id = db.fetchall()
 
         for i in range(len(all_id)):
             sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
-            val = (announcement, f"Professor ({prof_name}) [{prof_choice}]", now, all_id[i][0])
+            val = (announcement, f"Professor ({prof_name}) [{course_name}]", now, all_id[i][0])
             db.execute(sql, val)
             mydb.commit()
-
-
-        while True:
-            print()
-            back = input("Announcement Sent. Press (S) To Send Another:\n"
-                         "                   Press (M) To Return To Professor Menu: ").lower()
-            if back == "s":
-                prof_send_announcement()
-            elif back == "m":
-                ProfessorMenu(None)
-
-    elif confirmation == "no":
-        prof_send_announcement()
-
-
-
-
-
 
 # PROF INBOX
 def professor_inbox():
@@ -4619,12 +4719,16 @@ def professor_inbox():
 
     while True:
         print()
+        print("Press (O) To Open A Notification:")
+        print()
         print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
         print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
         print("Press (M) To Filter By Message:           |  Press (S) To Return To Professor Menu:")
         print()
         filter = input("Choose An Option: ")
-        if filter == "d":
+        if filter == "o":
+            open_prof_notification(all_notifications)
+        elif filter == "d":
             filter_prof_notification_by_date(all_notifications)
         elif filter == "f":
             filter_prof_notification_by_received_from(all_notifications)
@@ -4636,6 +4740,170 @@ def professor_inbox():
             clear_all_professor_notifications(Prof.getID())
         elif filter == "s":
             ProfessorMenu(None)
+
+# OPEN NOTIFICATION
+def open_prof_notification(notification):
+    all_possible_id = [str(notification[i][0]) for i in range(len(notification))]
+    print()
+    while True:
+        noti_id = input("Enter The Id Of The Notification: ")
+        if noti_id not in all_possible_id:
+            print("Invalid Id")
+        else:
+            break
+    sql = "SELECT id, notification, received_from, date FROM professor_notification WHERE id = %s"
+    val = (int(noti_id),)
+    db.execute(sql, val)
+    notification_to_open = db.fetchall()
+    clear()
+    # AUTO FIT THE BROKEN LINES
+    max_len_of_attributes = max([len(notification_to_open[0][1]), len(notification_to_open[0][2])])
+    if max_len_of_attributes == len(notification_to_open[0][1]):
+        broken_line_added = "-" * len("Message: ")
+    else:
+        broken_line_added = "-" * len("Received From: ")
+
+    message = notification_to_open[0][1]
+    received_from = notification_to_open[0][2]
+    print("-" * max_len_of_attributes + broken_line_added)
+    print(f"Id: {notification_to_open[0][0]}")
+    print(f"Date: {notification_to_open[0][3]}")
+    print(f"Received From: {notification_to_open[0][2]}")
+    print(f"Message: {notification_to_open[0][1]}")
+    print("-" * max_len_of_attributes + broken_line_added)
+    print()
+    assignment = False
+    if "Submitted" in message:
+        assignment = True
+        print("Press (V) To View Submission:")
+
+    print("Press (R) To Respond:")
+    while True:
+        back = input("Press (B) To Go Back: ").lower()
+        # RESPONSE
+        if back == "r":
+            receiverName = extractNameFromNotification(received_from)["receiverName"]
+            receiverType = extractNameFromNotification(received_from)["Type"]
+            if receiverName == None:
+                while True:
+                    print()
+                    error = input("Unable To Respond: Please Contact The Dean. Press (B) To Go Back: ").lower()
+                    if error == "b":
+                        professor_inbox()
+                        break
+            else:
+                respondToNotification(prof_name, "Professor", receiverType, receiverName, message)
+        # ASSIGNMENT SUBMISSION
+        elif back == "v" and assignment:
+            try:
+                assign_id = int(message[-1])
+                # EXTRACT STU ID FROM MESSAGE
+                stu_id = extract_stu_id(message)
+            except:
+                while True:
+                    print()
+                    error = input("Error Loading Submission. Press (B) To Go Back: ").lower()
+                    if error == "b":
+                        ProfessorMenu(None)
+                        break
+            # OPEN THE ASSIGNMENT
+            prof_open_submission(stu_id, assign_id)
+
+
+        elif back == "b":
+            professor_inbox()
+            break
+
+def extract_stu_id(message):
+    stu_id = ""
+    i = 0
+    while message.split('(')[1][i].isdigit():
+        id_numbers = message.split('(')[1][i]
+        stu_id += id_numbers
+        i += 1
+    if stu_id != "":
+        return int(stu_id)
+    return None
+
+# OPEN SUBMISSION
+def prof_open_submission(stu_id, assign_id):
+    clear()
+    print("OPEN SUBMISSION")
+    print("---------------")
+    print()
+    # GET THE ASSIGNMENT QUESTIONS
+    sql = "SELECT questions, course_name FROM assignments WHERE id = %s"
+    val = (assign_id,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+       submission_loading_error()
+    # assign_questions = results
+    assign_questions = [results[i][0] for i in range(len(results))]
+    course_name = results[0][1]
+
+    # GET THE ASSIGNMENT ANSWERS
+    sql = "SELECT answers FROM assignment_submissions WHERE stu_id = %s"
+    val = (stu_id,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        submission_loading_error()
+    assign_answers = results[0][0].rstrip()
+    assign_answers = assign_answers.split('\n\n')
+
+    for i in range(len(assign_questions)):
+        print(f"{i+1}.{assign_questions[i]}")
+        print(f"{assign_answers[i][2:]}")
+        print()
+
+    assign_student_grade(stu_id, course_name)
+
+
+
+    while True:
+        print()
+        back = input("Grade Assigned. Press (B) To Go Back: ").lower()
+        if back == "b":
+            professor_inbox()
+            break
+
+def submission_loading_error():
+    while True:
+        print()
+        error = input("Error Loading Submission. Press (B) To Go Back: ").lower()
+        if error == "b":
+            ProfessorMenu(None)
+            break
+def assign_student_grade(stu_id, course_name):
+    while True:
+        print()
+        stu_grade = input("Assign Their Grade(%): ")
+        stu_grade = stu_grade.replace('%', '')
+
+        if not stu_grade.isdigit():
+            print()
+            print("Grade Must Be A Number")
+        else:
+            stu_grade = int(stu_grade)
+            if stu_grade < 0 or stu_grade > 100:
+                print()
+                print("Grade Can Only Be From 0 --> 100.")
+            else:
+                break
+    stu_grade = str(stu_grade) + '%'
+
+    while True:
+        print()
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Assign This Grade? ")
+        if confirmation == "yes" or confirmation == "no":
+            break
+
+    if confirmation == "yes":
+        update_grade_book(course_name, stu_id, stu_grade)
+    elif confirmation == "no":
+        ProfessorMenu(None)
+
 
 # FILTER PROFESSOR NOTIFICATIONS
 def filter_prof_notification_by_date(notifications):
@@ -4776,7 +5044,6 @@ def clear_professor_notification():
                 ProfessorMenu(None)
     else:
         ProfessorMenu(None)
-
 def clear_all_professor_notifications(prof_id):
     while True:
         print()
@@ -4799,8 +5066,591 @@ def clear_all_professor_notifications(prof_id):
         ProfessorMenu(None)
 
 
+# PROF CREATE EXAM
+def prof_create_assignment():
+    clear()
+    sql = "SELECT CoursesTaught FROM Professor WHERE name = %s"
+    val = (prof_name,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        while True:
+            print()
+            error = input("You Are Not Currently Teaching A Course So You Are Unable To Create An Assignment\n\n"
+                          "Press (M) To Return To Professor Menu").lower()
+            if error == "m":
+                ProfessorMenu(None)
+                break
+    prof_courses_taught = results[0][0].split()
+    print("CREATE ASSIGNMENT")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    print(f"Courses You Teach: {prof_courses_taught}")
+    print()
+    courses = {}
+    for i, course in enumerate(prof_courses_taught, 1):
+        print(f"{i} - Create {course} Assignment")
+        courses.update({i: course})
+
+    while True:
+        print()
+        prof_choice = input("Choose An Option : ")
+        if prof_choice.lower() == "c":
+            ProfessorMenu(None)
+        if prof_choice.isdigit():
+            range_of_choices = [i for i in range(1, len(prof_courses_taught) + 1)]
+            prof_choice = int(prof_choice)
+            if prof_choice not in range_of_choices:
+                print("Invalid Choice")
+            else:
+                break
+        else:
+            print("Invalid Choice")
+
+    createAssignment(courses[int(prof_choice)])
+
+# CREATE ASSIGNMENT
+def createAssignment(course_name):
+    clear()
+    print("CREATE ASSIGNMENT")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    print("AVAILABLE ASSIGNMENTS ")
+    print()
+    print("1 - Exam(Short Answer)        |  7 - Quiz(Short Answer)")
+    print("2 - Exam(Multiple Choice)     |  8 - Quiz(Multiple Choice)")
+    print("3 - Exam(Mixed)               |  9 - Quiz(Mixed)")
+    print("                              |")
+    print("4 - Test(Short Answer)        |")
+    print("5 - Test(Multiple Choice)     |")
+    print("6 - Test(Mixed)               |")
+    while True:
+        print()
+        assign_choice = input("Choose An Option: ").lower()
+        if assign_choice == "c":
+            ProfessorMenu(None)
+        if assign_choice == "1":
+            pass
+            break
+        # MULTIPLE CHOICE OPTIONS
+        elif assign_choice == "2" or assign_choice == "5" or assign_choice == "8":
+            if assign_choice == "2":
+                assignment_type = "Exam(Multiple Choice)"
+            elif assign_choice == "5":
+                assignment_type  = "Test(Multiple Choice)"
+            elif assign_choice == "8":
+                assignment_type = "Quiz(Multiple Choice)"
+            create_multiple_choice_assignment(course_name, assignment_type)
+        # SHORT ANSWER QUESTIONS
+        elif assign_choice == "1" or assign_choice == "4" or assign_choice == "7":
+            if assign_choice == "1":
+                assignment_type = "Exam(Short Answer)"
+            elif assign_choice == "4":
+                assignment_type = "Test(Short Answer)"
+            elif assign_choice == "7":
+                assignment_type = "Quiz(Short Answer)"
+            create_short_answer_assignment(course_name, assignment_type)
+
+# MULTIPLE CHOICE ASSIGNMENT
+def create_multiple_choice_assignment(course_name, assignment_type):
+    clear()
+    # GET PROFESSOR ID
+    sql = "SELECT id FROM Professor WHERE name = %s"
+    val = (prof_name, )
+    db.execute(sql, val)
+    prof_id = db.fetchall()[0][0]
+    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
+    print(f"CREATING {course_name} {assignment_type.upper()}")
+    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
+    print()
+    assign_type = assignment_type[:indexOf(assignment_type, "(")]
+    # TITLE
+    while True:
+        print()
+        assignment_title = input(f"{assign_type} Title: ")
+        if assignment_title.lower() == "c":
+            createAssignment(course_name)
+            break
+        if assignmentAlreadyExist(assignment_title):
+            print("That Assignment Has Already Been Created")
+        else:
+            if assignment_title != '':
+                break
+    # NUMBER OF QUESTIONS
+    while True:
+        print()
+        num_questions = input("Number Of Questions: ")
+        if num_questions.lower() == "c":
+            createAssignment(course_name)
+            break
+        if not num_questions.isdigit():
+            print("Must Be A Number")
+        else:
+            num_questions = int(num_questions)
+            break
+    # DURATION
+    while True:
+        print()
+        duration = input("Duration(Mins): ").lower()
+        if duration == "c":
+            createAssignment(course_name)
+            break
+        if not duration.isdigit():
+            print("Duration Must Be A Number")
+        else:
+            break
+    # DUE DATE
+    while True:
+        formatError = False
+        print()
+        due_date = input("Due Date(MM/DD/YYYY): ")
+        if due_date == "c":
+            createAssignment(course_name)
+            break
+        if validateDueDate(due_date) == 0:
+            formatError = True
+            print("Invalid Date Format")
+        elif validateDueDate(due_date) == -1:
+            formatError = True
+            print("Invalid Month")
+        elif validateDueDate(due_date) == -2:
+            formatError = True
+            print("Invalid Day")
+        elif validateDueDate(due_date) == -3:
+            formatError = True
+            print("That Date Has Already Passed")
+        if not formatError:
+            break
+    # DESCRIPTION
+    print()
+    assignment_description = input(f"{assign_type} Description(Optional): ")
+    if assignment_description.lower() == "c":
+        createAssignment(course_name)
+
+    questions = {}
+    answer_prompts = {}
+    correct_answers = {}
+    answer_choices = ['a.', 'b.', 'c.', 'd.']
+    for i in range(1, num_questions + 1):
+        print()
+        # GET THE QUESTION
+        assigned_questions = input(f"Question: {i}: ")
+        if assigned_questions.lower() == "c":
+            ProfessorMenu(None)
+        questions.update({i: assigned_questions})
+        tmp_prompt_answer = {}
+        # GET THE ASSIGNED PROMPTS
+        for choice in answer_choices:
+            assigned_ans_prompt = input(f"{choice}: ")
+            if assigned_ans_prompt.lower() == "c":
+                ProfessorMenu(None)
+            tmp_prompt_answer.update({choice: assigned_ans_prompt})
+        # STORE ALL THE PROMPT ANSWERS
+        prompt_ans_to_store = f"a. {tmp_prompt_answer['a.']}\nb. {tmp_prompt_answer['b.']}\nc. {tmp_prompt_answer['c.']}\nd. {tmp_prompt_answer['d.']}"
+        answer_prompts.update({i: prompt_ans_to_store})
+        # GET THE CORRECT ANSWER
+        while True:
+            correct_answer = input("Enter The Correct Answer: ").lower()
+            correct_answer += '.'
+            if correct_answer not in answer_choices:
+                print("Invalid Choice. Enter a, b, c, or d")
+                print()
+            else:
+                correct_answers.update({i: correct_answer})
+                break
+
+    clear()
+    print("------------")
+    print(f"{assign_type} CREATED")
+    print("------------")
+    print()
+    if assignment_description != '':
+        print("-" * len(assignment_description))
+        print(assignment_description)
+        print("-" * len(assignment_description))
+        print()
+    print(f"Duration: {duration}")
+    print(f"Due Date: {due_date}")
+    print()
+    for i in range(1, num_questions +1):
+        print(questions[i])
+        print(answer_prompts[i])
+        print(f"Correct Answer: {correct_answers[i]}")
+        print()
+
+
+    # CONFIRMATION
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Do You Want To Save This {assign_type}? ").lower()
+        if confirmation == "yes" or confirmation == "no":
+            break
+
+    if confirmation == "yes":
+        db.execute("SELECT id FROM assignments")
+        results = db.fetchall()
+        if len(results) == 0:
+            assign_id = 1
+        else:
+            assign_id = results[len(results) - 1][0] + 1
+
+        for question in questions:
+            # QUESTIONS
+            question_num = question
+            Questions = questions[question]
+            # ANSWERS
+            answer_prompt_num = question
+            answer_prompt = answer_prompts[question]
+            # CORRECT ANSWERS
+            correct_answer_num = question
+            correct_answer = correct_answers[question]
+
+            sql = "INSERT INTO assignments (id, assignment_type, title, description, question_num, questions, answer_prompts_num, answer_prompts, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name)" \
+                  "VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            val = (assign_id, assign_type, assignment_title, assignment_description, question_num, Questions,
+                   answer_prompt_num, answer_prompt, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name)
+            db.execute(sql, val)
+            mydb.commit()
+
+        while True:
+            print()
+            back = input(f"{assign_type} Saved. Press (M) To Return To Professor Menu: ").lower()
+            if back == "m":
+                ProfessorMenu(None)
+    elif confirmation == "no":
+        ProfessorMenu(None)
+# SHORT ANSWER ASSIGNMENT
+def create_short_answer_assignment(course_name, assignment_type):
+    clear()
+    # GET PROFESSOR ID
+    sql = "SELECT id FROM Professor WHERE name = %s"
+    val = (prof_name,)
+    db.execute(sql, val)
+    prof_id = db.fetchall()[0][0]
+    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
+    print(f"CREATING {course_name} {assignment_type.upper()}")
+    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
+    print()
+    assign_type = assignment_type[:indexOf(assignment_type, "(")]
+    # TITLE
+    while True:
+        print()
+        assignment_title = input(f"{assign_type} Title: ")
+        if assignment_title.lower() == "c":
+            createAssignment(course_name)
+            break
+        if assignmentAlreadyExist(assignment_title):
+            print("That Assignment Has Already Been Created")
+        else:
+            if assignment_title != '':
+                break
+    # NUMBER OF QUESTIONS
+    while True:
+        print()
+        num_questions = input("Number Of Questions: ")
+        if num_questions.lower() == "c":
+            createAssignment(course_name)
+            break
+        if not num_questions.isdigit():
+            print("Must Be A Number")
+        else:
+            num_questions = int(num_questions)
+            break
+    # DURATION
+    while True:
+        print()
+        duration = input("Duration(Mins): ").lower()
+        if duration == "c":
+            createAssignment(course_name)
+            break
+        if not duration.isdigit():
+            print("Duration Must Be A Number")
+        else:
+            break
+    # DUE DATE
+    while True:
+        formatError = False
+        print()
+        due_date = input("Due Date(MM/DD/YYYY): ")
+        if due_date == "c":
+            createAssignment(course_name)
+            break
+        if validateDueDate(due_date) == 0:
+            formatError = True
+            print("Invalid Date Format")
+        elif validateDueDate(due_date) == -1:
+            formatError = True
+            print("Invalid Month")
+        elif validateDueDate(due_date) == -2:
+            formatError = True
+            print("Invalid Day")
+        elif validateDueDate(due_date) == -3:
+            formatError = True
+            print("That Date Has Already Passed")
+        if not formatError:
+            break
+    # DESCRIPTION
+    print()
+    assignment_description = input(f"{assign_type} Description(Optional): ")
+    if assignment_description.lower() == "c":
+        createAssignment(course_name)
+
+    questions = {}
+    for i in range(1, num_questions + 1):
+        print()
+        # GET THE QUESTION
+        assigned_questions = input(f"Question: {i}: ")
+        if assigned_questions.lower() == "c":
+            ProfessorMenu(None)
+        questions.update({i: assigned_questions})
+
+
+    clear()
+    print("------------")
+    print(f"{assign_type} CREATED")
+    print("------------")
+    print()
+    if assignment_description != '':
+        print("-" * len(assignment_description))
+        print(assignment_description)
+        print("-" * len(assignment_description))
+        print()
+    print(f"Duration: {duration}")
+    print(f"Due Date: {due_date}")
+    print()
+    for i in range(1, num_questions + 1):
+        print(f"{i}.{questions[i]}")
+        print()
+
+    # CONFIRMATION
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Do You Want To Save This {assign_type}? ").lower()
+        if confirmation == "yes" or confirmation == "no":
+            break
+
+    if confirmation == "yes":
+        db.execute("SELECT id FROM assignments")
+        results = db.fetchall()
+        if len(results) == 0:
+            assign_id = 1
+        else:
+            assign_id = results[len(results) - 1][0] + 1
+
+        for question in questions:
+            # QUESTIONS
+            question_num = question
+            Questions = questions[question]
+
+            sql = "INSERT INTO assignments (id, assignment_type, title, description, question_num, questions, prof_id, duration, due_date, course_name)" \
+                  "VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            val = (assign_id, assign_type, assignment_title, assignment_description, question_num, Questions, prof_id, duration, due_date, course_name)
+            db.execute(sql, val)
+            mydb.commit()
+
+        while True:
+            print()
+            back = input(f"{assign_type} Saved. Press (M) To Return To Professor Menu: ").lower()
+            if back == "m":
+                ProfessorMenu(None)
+    elif confirmation == "no":
+        ProfessorMenu(None)
+def validateDueDate(due_date):
+    tmp_date = due_date
+    all_months = {"January", "February", "March", "April", "May", "June", "July", "August",
+                  "September", "October", "November", "December"}
+
+    try:
+        due_date = due_date.split()
+        due_date_month = due_date[0]
+        due_date_day = int(due_date[1].replace(',', ''))
+        due_date_year = int(due_date[2])
+    except:
+        return 0
+
+    # INVALID MONTH
+    if due_date_month not in all_months:
+        return -1
+    # INVALID DAY
+    if due_date_day < 1 or due_date_day > 31 if due_date_month != "February" else 28:
+        return -2
+    # DATE HAS PASSED
+    if isDue(tmp_date):
+        return -3
+
+    return 1
+def assignmentAlreadyExist(title):
+    sql =  "SELECT * FROM assignments WHERE title = %s"
+    val = (title,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return False
+    return True
+
+
+# ISSUE ASSIGNMENT
+def prof_issue_assignment():
+    clear()
+    # GET PROF ID
+    prof_id = Professor.get_prof_id(prof_name)
+    sql = "SELECT title, assignment_type, due_date FROM assignments WHERE prof_id = %s ORDER BY id ASC"
+    val = (prof_id,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if results == 0:
+        return
+
+    all_created_assignments = removeDuplicates([assign[0] for assign in results])
+    all_assignment_types    = removeRightDuplicateAssignmentTypes(all_created_assignments)
+
+
+    print("All Created Assignments")
+    print(now)
+    print("-------------------")
+    print("Press (C) To Cancel")
+    print("-------------------")
+    print()
+    print("Press (D) To Delete An Assignment")
+    print()
+
+    # STORE THE ASSIGNMENT INCREMENT IN A DICT SO IT CAN EASILY BE DELETED
+    assign_inc = {}
+    for i in range(len(all_created_assignments)):
+        assign_inc.update({i+1: all_created_assignments[i]})
+        print(f"{i + 1} - {all_created_assignments[i]} ({all_assignment_types[i]})")
+
+    while True:
+        print()
+        assign_to_issue = input("Select An Assignment: ")
+        if assign_to_issue.lower() == "c":
+            ProfessorMenu(None)
+        elif assign_to_issue.lower() == "d":
+            while True:
+                print()
+                assign_to_delete = input("Enter The Number Of The Assignment To Delete: ").lower()
+                if assign_to_delete == "c":
+                    prof_issue_assignment()
+                    break
+                if assign_to_delete not in [str(i + 1) for i in range(len(all_created_assignments))]:
+                    print("Invalid Assignment")
+                else:
+                    delete_assignment(assign_inc[int(assign_to_delete)])
+                    break
+
+        if assign_to_issue not in [str(i + 1) for i in range(len(all_created_assignments))]:
+            print("Invalid Assignment")
+        else:
+            break
+    assignment_to_issue = all_created_assignments[int(assign_to_issue) - 1]
+    assignment_type = all_assignment_types[int(assign_to_issue) - 1]
+
+    clear()
+    open_assignment(assignment_to_issue)
+
+    # CONFIRMATION
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Are You Sure You Want To Issue {assignment_to_issue}? ").lower()
+        if confirmation == "yes" or confirmation == "no":
+            break
+
+    if confirmation == "yes":
+        sql = "SELECT due_date, course_name, id FROM assignments WHERE title = %s"
+        val = (assignment_to_issue,)
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            due_date    = "Unknown"
+            course_name = "Unknown"
+            assign_id   = "Unknown"
+        else:
+            due_date    = results[0][0]
+            course_name = results[0][1]
+            assign_id   = results[0][2]
+        announcement = f"You Have An Upcoming {course_name} {assignment_type} Due {due_date} ID: {assign_id}"
+        prof_send_announcement(announcement, course_name)
+
+        while True:
+            print()
+            back = input("Assignment Issued. Press (M) To Return To Professor Menu: ").lower()
+            if back == "m":
+                ProfessorMenu(None)
+    elif confirmation == "no":
+        ProfessorMenu(None)
+
+
+
+# OPEN ASSIGNMENT
+def open_assignment(assignment_title):
+    sql = "SELECT * FROM assignments WHERE title = %s"
+    val = (assignment_title,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    title = results[0][2]
+    description = results[0][3]
+    duration = results[0][11]
+    due_date = results[0][12]
+    num_assign_questions = len(results)
+    # RETRIEVE THE CORRECT ANSWERS
+    assign_answers = {}
+    for i in range(len(results)):
+        assign_answers.update({results[i][8]: results[i][9]})
+
+    print(f"<<<<<<<<<< {title} >>>>>>>>>>")
+    print()
+    if description != '':
+        print("-" * len(description))
+        print(description)
+        print("-" * len(description))
+        print()
+    print(f"Duration: {duration} Mins")
+    print(f"Due Date: {due_date}")
+    print()
+    for i in range(num_assign_questions):
+        print(f"{i + 1}.{results[i][5]}")
+        print(results[i][7])
+        print(f"Correct Answer: {assign_answers[i+1]}")
+        print()
+
+    while True:
+        print()
+        back = input("Press (I) To Issue This Assignment:\nPress (C) To Cancel: ").lower()
+        if back == "i":
+            return
+        elif back == "c":
+            prof_issue_assignment()
+# DELETE ASSIGNMENT
+def delete_assignment(assignment_title):
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Are You Sure You Want To Delete ({assignment_title})? ").lower()
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = "DELETE FROM assignments WHERE title = %s"
+        val = (assignment_title,)
+        db.execute(sql, val)
+        mydb.commit()
+        while True:
+            print()
+            back = input("Assignment Deleted. Press (B) To Go Back: ").lower()
+            if back == "b":
+                prof_issue_assignment()
+                break
+    elif confirmation == "no":
+        prof_issue_assignment()
+
+
 # STUDENT MENU
 def StudentMenu(name):
+    update_student_grades()
     clear()
     print("STUDENT MENU")
     if name != None:
@@ -4885,11 +5735,17 @@ def view_student_profile():
     print("-" * len(Stu.getAddress()) + "---------")
     print()
     while True:
-        back = input("Press (C) To Change Your Password:\nPress (D) To Drop A Class:\nPress (R) To Request Major Change:\nPress (M) To Return To Student Menu: ").lower()
+        back = input("Press (C) To Change Your Password:\n"
+                     "Press (D) To Drop A Class:\n"
+                     "Press (R) To Request Major Change:\n"
+                     "Press (V) To View Grade Book:\n"
+                     "Press (M) To Return To Student Menu: ").lower()
         if back == "m":
             StudentMenu(Stu.getFullName())
         elif back == "r":
             request_major_change(Stu.getID(), Stu.getFullName(), Stu.getMajor())
+        elif back == "v":
+            student_view_grade_book(Stu.getID())
         elif back == "d":
             drop_class(Stu.getID(), Stu.getCoursesEnrolledIn())
         elif back == "c":
@@ -4945,6 +5801,38 @@ def change_student_password(stu_name, stu_id):
         if back == "b":
             StudentMenu(stu_name)
 
+# VIEW GRADE BOOK
+def student_view_grade_book(stu_id):
+    clear()
+    print("---------------")
+    print("YOUR GRADE BOOK")
+    print("---------------")
+    print()
+    sql = "SELECT * FROM grade_book WHERE stu_id = %s"
+    val = (stu_id,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    grade_book = {}
+    course_names = [results[i][2] for i in range(len(results))]
+    course_grades = [results[i][3:] for i in range(len(results))]
+
+    for i in range(len(course_names)):
+        grade_book.update({course_names[i]: course_grades[i]})
+
+    for grade in grade_book:
+        print(f"{grade} |GRADE-1|GRADE-2|GRADE-3|GRADE-4|GRADE-5|AVG")
+        grades_to_avg = [grade for grade in grade_book[grade] if grade != None]
+        stu_avg = compute_average(grades_to_avg)
+
+        print(f" " * (len(grade) + 1) + f"{[grade_book[grade][i] for i in range(len(grade_book[grade]))]} {stu_avg}%")
+        print()
+
+    while True:
+        print()
+        back = input("Press (B) To Go Back: ").lower()
+        if back == "b":
+            view_student_profile()
+            break
 # STUDENT INBOX
 def student_inbox():
     clear()
@@ -4982,24 +5870,335 @@ def student_inbox():
 
     while True:
         print()
+        print("Press (O) To Open A Notification: ")
+        print()
         print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
         print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
         print("Press (M) To Filter By Message:           |  Press (S) To Return To Student Menu:")
         print()
         filter = input("Choose An Option: ")
-        if filter == "d":
+        if filter == "o":
+            open_stu_notification(all_notifications)
+            break
+        elif filter == "d":
             filter_stu_notification_by_date(all_notifications)
+            break
         elif filter == "f":
             filter_stu_notification_by_received_from(all_notifications)
+            break
         elif filter == "m":
             filter_stu_notification_by_message(all_notifications)
+            break
         elif filter == "c":
             clear_student_notification()
+            break
         elif filter == "ca":
             clear_all_student_notifications(Stu.getID())
+            break
         elif filter == "s":
             StudentMenu(None)
+            break
 
+# OPEN NOTIFICATION
+def open_stu_notification(notification):
+    all_possible_id = [str(notification[i][0]) for i in range(len(notification))]
+    print()
+    while True:
+        noti_id = input("Enter The Id Of The Notification: ")
+        if noti_id not in all_possible_id:
+            print("Invalid Id")
+        else:
+            break
+    sql = "SELECT id, notification, received_from, date FROM student_notification WHERE id = %s"
+    val = (int(noti_id),)
+    db.execute(sql, val)
+    notification_to_open = db.fetchall()
+    clear()
+    # AUTO FIT THE BROKEN LINES
+    max_len_of_attributes = max([len(notification_to_open[0][1]), len(notification_to_open[0][2])])
+    if max_len_of_attributes == len(notification_to_open[0][1]):
+        broken_line_added = "-" * len("Message: ")
+    else:
+        broken_line_added = "-" * len("Received From: ")
+
+    message = notification_to_open[0][1]
+    received_from = notification_to_open[0][2]
+    print("-" * max_len_of_attributes + broken_line_added)
+    print(f"Id: {notification_to_open[0][0]}")
+    print(f"Date: {notification_to_open[0][3]}")
+    print(f"Received From: {notification_to_open[0][2]}")
+    print(f"Message: {notification_to_open[0][1]}")
+    print("-" * max_len_of_attributes + broken_line_added)
+    print()
+
+    print("Press (R) To Respond:")
+    if "Test" in message or "Quiz" in message or "Exam" in message:
+        assignment = True
+        print("Press (S) To Begin:")
+    else:
+        assignment = False
+    while True:
+        back = input("Press (B) To Go Back: ").lower()
+        if back == "r":
+            receiverName = extractNameFromNotification(received_from)["receiverName"]
+            receiverType = extractNameFromNotification(received_from)["Type"]
+
+            if receiverName == None:
+                if receiverType == "Dean":
+                    respondToNotification(stu_name, "Student", receiverType, receiverName, message)
+                while True:
+                    print()
+                    error = input("Unable To Respond: Please Contact The Dean. Press (B) To Go Back: ").lower()
+                    if error == "b":
+                        student_inbox()
+                        break
+            else:
+                respondToNotification(stu_name, "Student", receiverType, receiverName, message)
+        elif back == "s" and assignment:
+            assignment_id = message.split()[-1]
+            take_assign(assignment_id)
+            break
+
+        elif back == "b":
+            student_inbox()
+            break
+
+# TAKE ASSIGNMENT
+def take_assign(assignment_id):
+    clear()
+    stu_id = get_student_id(stu_name)
+
+    sql = "SELECT * FROM assignments WHERE id = %s"
+    val = (assignment_id,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    assign_type = results[0][1]
+    title = results[0][2]
+    description = results[0][3]
+    duration = results[0][11]
+    due_date = results[0][12]
+    course_name = results[0][13]
+
+    num_assign_questions = len(results)
+
+    # CHECKING IF THE DUE DATE HAS PASSED
+    if isDue(due_date):
+        while True:
+            print("---------------")
+            print("DUE DATE PASSED")
+            print("---------------")
+            print()
+            print(f"Due Date: {due_date}")
+            print()
+            back = input("The Due Date For This Assignment Has Passed. Press (B) To Go Back: ").lower()
+            if back == "b":
+                student_inbox()
+                break
+
+    # THE ASSIGNMENT IS SHORT ANSWER
+    if results[0][6] == None and results[0][7] == None and results[0][8] == None and results[0][9] == None:
+        prof_id = results[0][10]
+        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
+        print()
+        print(f"Duration: {duration} Mins")
+        print(f"Due Date: {due_date}")
+        print(f"Number Of Questions: {num_assign_questions}")
+        print()
+        if description != None:
+            print("-" * len(description))
+            print(description)
+            print("-" * len(description))
+            print()
+
+        student_answers = {}
+
+        for i in range(num_assign_questions):
+            print(f"{i + 1}.{results[i][5]}")
+            while True:
+                answer = input("Answer: ")
+                if answer != '':
+                    break
+            student_answers.update({i + 1: answer})
+            print()
+
+        answers_to_add_to_db = ""
+        for ans in student_answers:
+            answers_to_add_to_db += f"{ans}.{student_answers[ans]}\n"
+            answers_to_add_to_db += "\n"
+
+        # SEND ASSIGNMENT TO PROFESSOR
+        notification = f"{stu_name}({stu_id}) Submitted {title} ID: {assignment_id}"
+        received_from = f"Student ({stu_name})"
+
+        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, prof_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # ADD ASSIGNMENT TO DATABASE
+        sql = "INSERT INTO assignment_submissions (stu_id, assignment_id, answers) VALUES (%s, %s, %s)"
+        val = (stu_id, assignment_id, answers_to_add_to_db)
+        db.execute(sql, val)
+        mydb.commit()
+
+        while True:
+            print()
+            back = input("Assignment Complete. Press (M) To Return To Student Menu: ").lower()
+            if back == "m":
+                StudentMenu(None)
+
+    # THE ASSIGNMENT IS MULTIPLE CHOICE
+    # TODO - CHECK FOR INVALID ASSIGNMENT(IF ANY IMPORTANT INFO IS NONE) AND RETURN AN ERROR MESSAGE TO THE STUDENT
+    # RETRIEVE THE CORRECT ANSWERS
+    assign_answers = {}
+    for i in range(len(results)):
+        assign_answers.update({results[i][8]: results[i][9]})
+    print(f"<<<<<<<<<< {title} >>>>>>>>>>")
+    print()
+    print(f"Duration: {duration} Mins")
+    print(f"Due Date: {due_date}")
+    print(f"Number Of Questions: {num_assign_questions}")
+    print()
+    if description != None:
+        print("-" * len(description))
+        print(description)
+        print("-" * len(description))
+        print()
+
+    student_answers = {}
+
+    for i in range(num_assign_questions):
+        print(f"{i + 1}.{results[i][5]}")
+        print(results[i][7])
+        while True:
+            answer = input("Answer: ")
+            if answer in ['a', 'b', 'c', 'd']:
+                break
+        student_answers.update({i + 1: answer})
+        print()
+
+    grade = checkAssignment(assign_answers, student_answers, num_assign_questions)[0]
+    stu_correct_answers = checkAssignment(assign_answers, student_answers, num_assign_questions)[1]
+    stu_incorrect_answers = checkAssignment(assign_answers, student_answers, num_assign_questions)[2]
+    print()
+    print(f"<<<<<<<<<< RESULT >>>>>>>>>>")
+    print()
+    print(f"GRADE: {grade}")
+    print(f"Questions You Got Correct: {stu_correct_answers}")
+    print(f"Questions You Got Incorrect: {stu_incorrect_answers}")
+    print()
+
+    if assign_type == "Quiz":
+        print("Press (R) To Retake Quiz:")
+
+    while True:
+        back = input("Press (M) To Return To Student Menu: ").lower()
+        if back == "r" and assign_type == "Quiz":
+            take_assign(assignment_id)
+            break
+        elif back == "m":
+            # UPDATE STUDENT GRADE BOOK
+            assignment_grade = grade.replace(' ', '')
+            update_grade_book(course_name, stu_id, assignment_grade)
+
+            mydb.commit()
+
+            StudentMenu(None)
+
+
+def checkAssignment(correct_answers, student_answers, num_questions):
+    correct_answers = [correct_answers[ans] for ans in correct_answers]
+    student_answers = [student_answers[ans] for ans in student_answers]
+
+    student_correct_ans   = []
+    student_incorrect_ans = []
+    for i in range(len(correct_answers)):
+        if student_answers[i] == correct_answers[i].replace('.', ''):
+            student_correct_ans.append(i+1)
+        else:
+            student_incorrect_ans.append(i+1)
+
+    grade = str(int((len(student_correct_ans) / num_questions) * 100))
+    grade = f"{grade} %"
+
+    if len(student_correct_ans) == 0:
+        student_correct_ans = None
+    if len(student_incorrect_ans) == 0:
+        student_incorrect_ans = None
+
+    return (grade, student_correct_ans, student_incorrect_ans)
+def isDue(due_date):
+    all_months = {"January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, "July": 7, "August": 8,
+                  "September": 9, "October": 10, "November": 11, "December": 12}
+
+    try:
+        today_date_day   = now.split()[1].replace(',', '')
+        today_date_month = now.split()[0]
+        today_date_year  = now.split()[2]
+
+        due_date_day   = due_date.split()[1].replace(',', '')
+        due_date_month = due_date.split()[0]
+        due_date_year  = due_date.split()[2].replace(',', '')
+
+        Today    = [all_months[today_date_month], today_date_day, today_date_year]
+        Due_Date = [all_months[due_date_month], due_date_day, due_date_year]
+
+        # THE YEAR HAS PASSED
+        if Due_Date[2] < Today[2]:
+            return True
+        # MONTH HAS PASSED
+        if Due_Date[0] < Today[0]:
+            return True
+        # DAY HAS PASSED
+        if Due_Date[0] == Today[0]:
+            if Due_Date[1] < Today[1]:
+                return True
+        return False
+    except:
+        return False
+
+def update_grade_book(course_name, stu_id, assign_grade):
+    # UPDATE STUDENT GRADE BOOK
+    sql = "SELECT * FROM grade_book WHERE stu_id = %s AND course_name = %s"
+    val = (stu_id,course_name)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        results =  [None, None, None, None, None, None, None, None, None, None]
+    else:
+        results = results[0]
+
+    grade_book = {
+        'grade_1': results[3],
+        'grade_2': results[4],
+        'grade_3': results[5],
+        'grade_4': results[6],
+        'grade_5': results[7],
+    }
+    assignment_grade = assign_grade
+
+    for grade in grade_book:
+        sql = "SELECT course_name FROM grade_book WHERE course_name = %s AND stu_id = %s"
+        val = (course_name, stu_id)
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) != 0:
+            if grade_book[grade] == None:
+                sql = f"UPDATE grade_book SET {grade} = %s WHERE stu_id = %s"
+                val = (assignment_grade, stu_id)
+                db.execute(sql, val)
+                mydb.commit()
+                return
+        if len(results) == 0:
+            sql = "INSERT INTO grade_book (stu_id, course_name, grade_1) VALUES (%s, %s, %s)"
+            val = (stu_id, course_name, assignment_grade)
+            db.execute(sql, val)
+            mydb.commit()
+            return
+    sql = "UPDATE grade_book SET grade_5 = %s WHERE stu_id = %s AND course_name = %s"
+    val = (assignment_grade, stu_id, course_name)
+    db.execute(sql, val)
+    mydb.commit()
 # FILTER STUDENT NOTIFICATIONS
 def filter_stu_notification_by_date(notifications):
     while True:
@@ -5258,14 +6457,13 @@ def stu_send_notification():
     while True:
         print()
         to = input("To (Dean, Professor, Or Student): ").capitalize()
+        if to == "C":
+            StudentMenu(None)
+            break
         if to != '' and (to == "Student" or to == "Professor" or to == "Dean"):
             break
         if to == '' or (to != "Student" or to != "Professor" or to != "Dean"):
             print("Messages Can Only Be Sent To: Dean, Professor Or Student")
-
-    # CHECKING IF C WAS ENTERED
-    if to.lower() == "c":
-        StudentMenu(None)
 
     # STUDENT
     if to == "Student":
@@ -5390,6 +6588,107 @@ def stu_send_notification():
 
 
 
+def respondToNotification(senderName, senderType, receiverType, receiver_name, previous_message):
+    while True:
+        print()
+        message = input("Enter Your Message: ")
+        if message == "b":
+            student_inbox()
+        if message != '':
+            break
+
+    while True:
+        confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ")
+        if confirmation == "yes" or confirmation == "no":
+            break
+
+
+    if confirmation == "yes":
+        if receiverType == "Dean":
+            table_to_insert = "dean_notification"
+            id_type = "person_id"
+        elif receiverType == "Professor":
+            table_to_insert = "professor_notification"
+            id_type = "prof_id"
+        elif receiverType == "Student":
+            table_to_insert = "student_notification"
+            id_type = "stu_id"
+        else:
+            return
+
+        # MESSAGE BEING SENT TO THE DEAN
+        if receiverType == "Dean" and receiver_name == None:
+            notification = message
+            received_from = f"{senderType} ({senderName})"
+            sql = f"SELECT id FROM {senderType} WHERE name = %s"
+            val = (senderName,)
+            db.execute(sql, val)
+            person_id = db.fetchall()[0][0]
+
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (notification, received_from, now, person_id)
+            db.execute(sql, val)
+            mydb.commit()
+        else:
+            # SET UP REGULAR NOTIFICATION
+            notification = message
+            received_from = f"{senderType} ({senderName})"
+            sql = f"SELECT id FROM {receiverType} WHERE name = %s"
+            val = (receiver_name,)
+            db.execute(sql, val)
+            person_id = db.fetchall()[0][0]
+
+            sql = f"INSERT INTO {table_to_insert} (notification, received_from, date, {id_type}) VALUES (%s, %s, %s, %s)"
+            val = (notification, received_from, now, person_id)
+            db.execute(sql, val)
+            mydb.commit()
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'date': now,
+                'senderType': senderType,
+                'senderName': senderName,
+                'senderMessage': message,
+
+                'preMessage': previous_message,
+
+                'receivedFrom': f'{receiver_name}'
+            }
+
+            createConversation(message, previous_message)
+
+
+
+        while True:
+            print()
+            back = input("Message Sent. Press (B) To Go Back: ").lower()
+            if back == "b":
+                if senderType == "Student":
+                    student_inbox()
+                    break
+                elif senderType == "Professor":
+                    professor_inbox()
+                    break
+                elif senderType == "Dean":
+                    dean_inbox()
+                    break
+                else:
+                    return
+
+    elif confirmation == "no":
+        student_inbox()
+def extractNameFromNotification(notification: str):
+    try:
+        receiver_name = notification[indexOf(notification, '(') + 1: indexOf(notification, ')')]
+    except:
+        receiver_name = None
+    try:
+        type = notification.split()[0]
+    except:
+        type = None
+
+    return {"receiverName": receiver_name, "Type": type}
+
+
 # VIEW ALL COURSES
 def view_all_courses_stu():
     clear()
@@ -5423,7 +6722,7 @@ def view_all_courses_stu():
 # SEARCH FOR COURSE
 def search_for_course_stu(came_from=None):
     if came_from != None:
-        clear()
+        pass
     while True:
         print()
         course_name = input("Enter The Name Of The Course: ").upper()
@@ -5452,6 +6751,7 @@ def select_course_stu(course_name):
     print("<<<<<<<<<<<<<<<< DESCRIPTION >>>>>>>>>>>>>>>>")
     print()
     print(course.getDescription())
+    print()
 
 
     try:
@@ -5794,7 +7094,25 @@ def checkCourse(sub_courses):
     return counter == len(sub_courses)
 def checkAge(age):
     return age.isdigit()
+def removeDuplicates(array):
+    found_items = []
+    for item in array:
+        if item not in found_items:
+            found_items.append(item)
 
+    return found_items
+def removeRightDuplicateAssignmentTypes(all_titles: list):
+    all_assign_types = []
+    for title in all_titles:
+        sql = "SELECT assignment_type FROM assignments WHERE title = %s LIMIT 1"
+        val = (title, )
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            return
+        all_assign_types.append(results[0][0])
+
+    return all_assign_types
 
 def view_all_course_general(came_from, args=None):
     clear()
@@ -5872,7 +7190,25 @@ def indexOf(string, index_of):
         if string[i] == index_of:
             return i
 
-
+# GET ID
+def get_student_id(name):
+    sql = "SELECT id FROM Student WHERE name = %s"
+    val = (name, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return
+    student_id = results[0][0]
+    return student_id
+def get_professor_id(name):
+    sql = "SELECT id FROM Professor WHERE name = %s"
+    val = (name, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return
+    prof_id = results[0][0]
+    return prof_id
 def reset_password(came_from):
     global password_attempts
     if came_from == "Dean":
@@ -6034,7 +7370,6 @@ def update_course_database():
         val = (professors_to_add_to_database, all_courses[i][0])
         db.execute(sql, val)
         mydb.commit()
-
 # UPDATE MAJOR DATABASE
 def update_major_database():
     all_majors = Major.getAllMajors()
@@ -6078,8 +7413,52 @@ def update_major_database():
                 val = (all_student_names, major)
                 db.execute(sql, val)
                 mydb.commit()
+# UPDATE STUDENT GRADES
+def update_student_grades():
+    # GET ALL STUDENT IDS
+    db.execute("SELECT id, name FROM Student")
+    all_stu_id = db.fetchall()
+    all_stu_id = [all_stu_id[i][0] for i in range(len(all_stu_id))]
 
+    for id in all_stu_id:
+        course_grades = {}
+        sql = "SELECT * FROM grade_book WHERE stu_id = %s"
+        val = (id, )
+        db.execute(sql, val)
+        results = db.fetchall()
+        stu_id = results[0][1] if len(results) != 0 else None
+        course_names = [results[i][2] for i in range(len(results))]
 
+        # RETRIEVE ONLY THE GRADES FROM THE RESULTS
+        results = [results[i][3:] for i in range(len(results))]
+        for i in range(len(course_names)):
+            grades_to_avg = [grade for grade in results[i] if grade != None]
+            # UPDATE course_grades USING THE COURSE NAME AND THE AVG OF THEIR 5 GRADES FOR THAT COURSE
+            course_grades.update({course_names[i]: str(compute_average(grades_to_avg)) + "%"})
+
+        # CONVERT THE DICT TO A STRING
+        grades_to_add_to_database = ""
+        for grade in course_grades:
+            grades_to_add_to_database += f"{grade}: {course_grades[grade]}"
+            grades_to_add_to_database += " "
+
+       # COMPUTE THE STUDENT'S OVERALL AVG USING ALL THEIR COURSE AVERAGES
+        student_grade_avg_for_each_grade_book = []
+        for i in range(len(results)):
+            grades_to_avg = [grade for grade in results[i] if grade != None]
+            student_grade_avg_for_each_grade_book.append(compute_average(grades_to_avg))
+        try:
+            studentAverage = round(sum(student_grade_avg_for_each_grade_book) // len(student_grade_avg_for_each_grade_book))
+        except ZeroDivisionError:
+            studentAverage = None
+        grades_to_add_to_database += f"AVG: {studentAverage}%"
+
+        # UPDATE THE DATABASE
+        if stu_id != None:
+            sql = "UPDATE Student SET grades = %s WHERE id = %s"
+            val = (grades_to_add_to_database, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
 
 if __name__ == '__main__':
     login()

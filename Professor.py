@@ -33,6 +33,7 @@ class Professor(Person):
     def getCoursesTaught(self):
         return self.__coursesTaught.split()
 
+
     # SPECIAL USE
     def getLenCoursesTaught(self):
         all_courses = ""
@@ -41,6 +42,7 @@ class Professor(Person):
             all_courses += " "
         all_courses = all_courses.rstrip()
         return len(all_courses) + (len(self.getCoursesTaught()) - 1) + len("Courses Taught: ") + 10
+
     # STATIC METHODS
     @staticmethod
     def checkIfCourseIsAvailableToSet(all_courses, subset_courses):
@@ -51,6 +53,18 @@ class Professor(Person):
                     course_has_been_found += 1
 
         return course_has_been_found == len(subset_courses)
+    @staticmethod
+    def get_prof_id(name):
+        sql = "SELECT id FROM Professor WHERE name = %s"
+        val = (name, )
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            return None
+        prof_id = results[0][0]
+
+        return prof_id
+
 
 
     def getID(self):
