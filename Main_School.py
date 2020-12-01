@@ -1580,7 +1580,7 @@ def view_students_enrolled_in_course_dean(course_name):
     val = (course_name,)
     db.execute(sql, val)
     result = db.fetchall()[0][0].split()
-    students_in_course = [result[i] + " " + result[i + 1] for i in range(len(result) // 2)]
+    students_in_course = [result[i+i] + " " + result[i+i+1] for i in range(len(result) // 2)]
 
     print(students_in_course)
 
@@ -1590,7 +1590,7 @@ def view_students_enrolled_in_course_dean(course_name):
         if tmp == "v":
             all_names = course.getStudentNamesInCourse().split()
             num_students_in_course = course.getStudentCountInCourse()
-            view_student_grade_for_course(all_names, num_students_in_course, course_name, "Dean")
+            view_student_grade_for_course(course_name, "Dean")
             break
         elif tmp == "a":
             dean_admin_options()
@@ -1868,6 +1868,8 @@ def dean_inbox():
 
     while True:
         print()
+        print("Press CON To View All Conversations")
+        print()
         print("Press (O) To Open A Notification:")
         print()
         print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
@@ -1875,7 +1877,9 @@ def dean_inbox():
         print("Press (M) To Filter By Message:           |  Press (S) To Return To Dean Menu:")
         print()
         filter = input("Choose An Option: ")
-        if filter == "o":
+        if filter == "con":
+            view_all_conversations(dean_name, 'Dean')
+        elif filter == "o":
             open_dean_notification(all_notifications)
         elif filter == "d":
             filter_dean_notification_by_date(all_notifications)
@@ -2147,20 +2151,39 @@ def dean_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Dean ({dean_name})", now, stu_id)
-        db.execute(sql, val)
-        mydb.commit()
-
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Dean Menu: ").lower()
-            if back == "s":
-                dean_send_notification()
-            elif back == "m":
-                DeanMenu(None)
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{dean_name}(Dean) To {stu_name}(Student)',
+                'date': now,
+                'senderType': "Dean",
+                'senderName': dean_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Dean ({dean_name})", now, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Dean Menu: ").lower()
+                if back == "s":
+                    dean_send_notification()
+                elif back == "m":
+                    DeanMenu(None)
+        elif confirmation == "no":
+            DeanMenu(dean_name)
 
     # PROFESSOR
     elif to == "Professor":
@@ -2183,23 +2206,41 @@ def dean_send_notification():
             message = input("Message: ")
             if message != '':
                 break
-
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Dean ({dean_name})", now, prof_id)
-        db.execute(sql, val)
-        mydb.commit()
-
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Dean Menu: ").lower()
-            if back == "s":
-                dean_send_notification()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
                 break
-            elif back == "m":
-                DeanMenu(None)
-                break
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{dean_name}(Dean) To {professor_name}(Professor)',
+                'date': now,
+                'senderType': "Dean",
+                'senderName': dean_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Dean ({dean_name})", now, prof_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Dean Menu: ").lower()
+                if back == "s":
+                    dean_send_notification()
+                    break
+                elif back == "m":
+                    DeanMenu(None)
+                    break
+        elif confirmation == "no":
+            DeanMenu(dean_name)
 
     # DEAN
     elif to == "Dean":
@@ -2228,23 +2269,42 @@ def dean_send_notification():
             message = input("Message: ")
             if message != '':
                 break
-
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Dean ({dean_name})", now, dean_id)
-        db.execute(sql, val)
-        mydb.commit()
-
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Dean Menu: ").lower()
-            if back == "s":
-                dean_send_notification()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
                 break
-            elif back == "m":
-                DeanMenu(None)
-                break
+
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{dean_name}(Dean) To {deanName}(Dean)',
+                'date': now,
+                'senderType': "Dean",
+                'senderName': dean_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Dean ({dean_name})", now, dean_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Dean Menu: ").lower()
+                if back == "s":
+                    dean_send_notification()
+                    break
+                elif back == "m":
+                    DeanMenu(None)
+                    break
+        elif confirmation == "no":
+            DeanMenu(dean_name)
 
 
 # ------ PROFESSOR RELATED OPTIONS ------#
@@ -4120,6 +4180,13 @@ def select_course_prof(course_name):
             elif back == "a":
                 add_course_to_list_of_courses_teached(course_name)
             elif back == "d":
+                if not profCanDropStudent(prof_name, course_name):
+                    while True:
+                        print()
+                        error = input("You Are Not Currently Teaching This Course So You Are Unable To Drop This Student. Press (B) To Go Back: ").lower()
+                        if error == "b":
+                            select_course_prof(course_name)
+
                 drop_student_from_course(course_name)
             elif back == "v":
                 view_student_grade_for_course(course_name)
@@ -4142,11 +4209,25 @@ def select_course_prof(course_name):
             ProfessorMenu(None)
 
 
+def profCanDropStudent(prof_name, course_name):
+    sql = "SELECT CoursesTaught FROM Professor WHERE name = %s"
+    val = (prof_name, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return False
+    results = results[0][0].split()
+    return course_name in results
+
+
 def get_class_average(course_name):
     sql = "SELECT * FROM grade_book WHERE course_name = %s"
     val = (course_name,)
     db.execute(sql, val)
     results = db.fetchall()
+    if len(results) == 0:
+        return 0
+
 
     grade_book = {}
 
@@ -4160,8 +4241,7 @@ def get_class_average(course_name):
 
     student_grade_book_averages = []
     for grades in grade_book:
-        grades_to_average = [grade_book[grades][i] for i in range(len(grade_book[grades])) if
-                             grade_book[grades][i] != None]
+        grades_to_average = [grade_book[grades][i] for i in range(len(grade_book[grades])) if grade_book[grades][i] != None]
         student_grade_book_averages.append(compute_average(grades_to_average))
 
     class_average = round(sum(student_grade_book_averages) / len(student_grade_book_averages))
@@ -4249,7 +4329,7 @@ def drop_student_from_course(course_name):
     if len(name_to_drop) == 1:
         name_to_drop = name_to_drop.lower()
     if name_to_drop == "c":
-        ProfessorMenu(None)
+        select_course_prof(course_name)
     # CHECKING IF THE STUDENT WAS FOUND
     sql = "SELECT * FROM Student WHERE name = %s"
     val = (name_to_drop, )
@@ -4486,20 +4566,40 @@ def prof_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Professor ({prof_name})", now, stu_id)
-        db.execute(sql, val)
-        mydb.commit()
-
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Professor Menu: ").lower()
-            if back == "s":
-                prof_send_notification()
-            elif back == "m":
-                ProfessorMenu(None)
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{prof_name}(Professor) To {stu_name}(Student)',
+                'date': now,
+                'senderType': "Professor",
+                'senderName': stu_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Professor ({prof_name})", now, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Professor Menu: ").lower()
+                if back == "s":
+                    prof_send_notification()
+                elif back == "m":
+                    ProfessorMenu(None)
+        elif confirmation == "no":
+            ProfessorMenu(prof_name)
+
 
     # PROFESSOR
     elif to == "Professor":
@@ -4523,22 +4623,41 @@ def prof_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Professor ({prof_name})", now, prof_id)
-        db.execute(sql, val)
-        mydb.commit()
-
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Professor Menu: ").lower()
-            if back == "s":
-                prof_send_notification()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
                 break
-            elif back == "m":
-                ProfessorMenu(None)
-                break
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{prof_name}(Professor) To {professor_name}(Professor)',
+                'date': now,
+                'senderType': "Professor",
+                'senderName': prof_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Professor ({prof_name})", now, prof_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Professor Menu: ").lower()
+                if back == "s":
+                    prof_send_notification()
+                    break
+                elif back == "m":
+                    ProfessorMenu(None)
+                    break
+        elif confirmation == "no":
+            ProfessorMenu(prof_name)
 
     # DEAN
     elif to == "Dean":
@@ -4568,22 +4687,41 @@ def prof_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Professor ({prof_name})", now, prof_id)
-        db.execute(sql, val)
-        mydb.commit()
-
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Professor Menu: ").lower()
-            if back == "s":
-                prof_send_notification()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
                 break
-            elif back == "m":
-                ProfessorMenu(None)
-                break
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{prof_name}(Professor) To {deanName}(Dean)',
+                'date': now,
+                'senderType': "Professor",
+                'senderName': prof_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Professor ({prof_name})", now, prof_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Professor Menu: ").lower()
+                if back == "s":
+                    prof_send_notification()
+                    break
+                elif back == "m":
+                    ProfessorMenu(None)
+                    break
+        elif confirmation == "no":
+            ProfessorMenu(prof_name)
 
 # PROF SEND ANNOUNCEMENT
 def prof_send_announcement(announcement_to_send=None, course_name=None):
@@ -4704,10 +4842,14 @@ def professor_inbox():
     for i in range(len(all_notifications)):
         # AUTO FIT THE BROKEN LINES
         max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2])])
-        if max_len_of_attributes == len(all_notifications[i][1]):
-            broken_line_added = "-" * len("Message: ")
+        if max_len_of_attributes > 120:
+            max_len_of_attributes = 120
+            broken_line_added = ''
         else:
-            broken_line_added = "-" * len("Received From: ")
+            if max_len_of_attributes == len(all_notifications[i][1]):
+                broken_line_added = "-" * len("Message: ")
+            else:
+                broken_line_added = "-" * len("Received From: ")
 
         print("-" * max_len_of_attributes + broken_line_added)
         print(f"Id: {all_notifications[i][0]}")
@@ -4719,6 +4861,8 @@ def professor_inbox():
 
     while True:
         print()
+        print("Press (CON) To View All Conversations:")
+        print()
         print("Press (O) To Open A Notification:")
         print()
         print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
@@ -4726,7 +4870,9 @@ def professor_inbox():
         print("Press (M) To Filter By Message:           |  Press (S) To Return To Professor Menu:")
         print()
         filter = input("Choose An Option: ")
-        if filter == "o":
+        if filter == 'con':
+            view_all_conversations(prof_name, 'Professor')
+        elif filter == "o":
             open_prof_notification(all_notifications)
         elif filter == "d":
             filter_prof_notification_by_date(all_notifications)
@@ -4813,6 +4959,10 @@ def open_prof_notification(notification):
         elif back == "b":
             professor_inbox()
             break
+
+
+
+
 
 def extract_stu_id(message):
     stu_id = ""
@@ -5870,6 +6020,7 @@ def student_inbox():
 
     while True:
         print()
+        print("Press (CON) To View All Conversations: ")
         print("Press (O) To Open A Notification: ")
         print()
         print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
@@ -5877,7 +6028,9 @@ def student_inbox():
         print("Press (M) To Filter By Message:           |  Press (S) To Return To Student Menu:")
         print()
         filter = input("Choose An Option: ")
-        if filter == "o":
+        if filter == "con":
+            view_all_conversations(stu_name, 'Student')
+        elif filter == "o":
             open_stu_notification(all_notifications)
             break
         elif filter == "d":
@@ -5898,6 +6051,66 @@ def student_inbox():
         elif filter == "s":
             StudentMenu(None)
             break
+
+# VIEW CONVERSATIONS
+def view_all_conversations(name, user):
+    clear()
+    print("-------------")
+    print("CONVERSATIONS")
+    print("-------------")
+    print()
+    sql =  "SELECT convoId, date FROM Conversations WHERE senderName = %s"
+    val = (name, )
+    db.execute(sql,val)
+    results = db.fetchall()
+    if len(results) == 0:
+        print("No Conversations")
+
+    results = removeDuplicates(results)
+    all_convo = {}
+
+
+    for i, convoInfo in enumerate(results,1):
+        all_convo.update({str(i): convoInfo[0]})
+        print("-"*len(convoInfo[0]) + "----")
+        print(f'    {convoInfo[1]}')
+        print(f'{i} - {convoInfo[0]}')
+        print("-" * len(convoInfo[0]) + "----")
+        print()
+
+    while True:
+        print()
+        back = input("Press (O) To Open A Conversation:\nPress (B) To Go Back: ").lower()
+        if back == "o" or back == "b":
+            break
+
+    if back == "o":
+        while True:
+            print()
+            convo_look_up = input("Enter The ID Of The Conversation: ")
+            all_possible_id = [str(i+1) for i in range(len(all_convo))]
+            if convo_look_up not in all_possible_id:
+                print("Invalid ID")
+                print()
+            else:
+                if convo_look_up.lower() == 'b':
+                    break
+                break
+        print()
+        convo_view(all_convo[convo_look_up], user, True)
+
+    if back == "b":
+        if user == 'Student':
+            student_inbox()
+        elif user == 'Professor':
+            professor_inbox()
+        elif user == 'Dean':
+            dean_inbox()
+
+
+
+
+
 
 # OPEN NOTIFICATION
 def open_stu_notification(notification):
@@ -6487,20 +6700,42 @@ def stu_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Student ({stu_name})", now, stu_id)
-        db.execute(sql, val)
-        mydb.commit()
-
+        # CONFIRMATION
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Student Menu: ").lower()
-            if back == "s":
-                stu_send_notification()
-            elif back == "m":
-                StudentMenu(None)
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{stu_name}(Student) To {student_name}(Student)',
+                'date': now,
+                'senderType': "Student",
+                'senderName': stu_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Student ({stu_name})", now, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Student Menu: ").lower()
+                if back == "s":
+                    stu_send_notification()
+                elif back == "m":
+                    StudentMenu(stu_name)
+        elif confirmation == "no":
+            StudentMenu(stu_name)
 
     # PROFESSOR
     elif to == "Professor":
@@ -6524,22 +6759,42 @@ def stu_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Professor ({prof_name})", now, prof_id)
-        db.execute(sql, val)
-        mydb.commit()
-
+        # CONFIRMATION
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Student Menu: ").lower()
-            if back == "s":
-                stu_send_notification()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
                 break
-            elif back == "m":
-                StudentMenu(None)
-                break
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{stu_name}(Student) To {professor_name}(Professor)',
+                'date': now,
+                'senderType': "Student",
+                'senderName': stu_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Student ({stu_name})", now, prof_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Student Menu: ").lower()
+                if back == "s":
+                    stu_send_notification()
+                    break
+                elif back == "m":
+                    StudentMenu(None)
+                    break
+        elif confirmation == "no":
+            StudentMenu(stu_name)
 
     # DEAN
     elif to == "Dean":
@@ -6569,31 +6824,67 @@ def stu_send_notification():
             if message != '':
                 break
 
-        # SET UP NOTIFICATION
-        sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"Student ({stu_name})", now, stu_id)
-        db.execute(sql, val)
-        mydb.commit()
-
+        # CONFIRMATION
         while True:
             print()
-            back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
-                         "                            Press (M) To Return To Student Menu: ").lower()
-            if back == "s":
-                stu_send_notification()
-                break
-            elif back == "m":
-                StudentMenu(None)
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Send This Message? ").lower()
+            if confirmation == "yes" or confirmation == "no":
                 break
 
+        if confirmation == "yes":
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': f'{stu_name}(Student) To {deanName}(Dean)',
+                'date': now,
+                'senderType': "Student",
+                'senderName': stu_name,
+                'preMessage': None,
+                'senderMessage': message,
+                'receivedFrom': None
+            }
+            createConversation(conversationInfo)
+
+            # SET UP NOTIFICATION
+            sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"Student ({stu_name})", now, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Your Message Has Been Sent. Press (S) To Send Another Message:\n"
+                             "                            Press (M) To Return To Student Menu: ").lower()
+                if back == "s":
+                    stu_send_notification()
+                    break
+                elif back == "m":
+                    StudentMenu(None)
+                    break
+        elif confirmation == "no":
+            StudentMenu(stu_name)
 
 
-def respondToNotification(senderName, senderType, receiverType, receiver_name, previous_message):
+
+def respondToNotification(senderName, senderType, receiverType, receiverName, previous_message):
+    # Kim Lenny(Professor) To Jaheim Archibald(Student)
+    convoID = f'{senderName}({senderType}) To {receiverName}({receiverType})'
+    print()
+    convo_view(convoID, senderType)
+    print()
+    print(f'[{receiverName}]: {previous_message}')
     while True:
         print()
         message = input("Enter Your Message: ")
-        if message == "b":
-            student_inbox()
+        if message == "c":
+            if senderType == "Student":
+                student_inbox()
+                break
+            elif senderType == "Professor":
+                professor_inbox()
+                break
+            elif senderType == "Dean":
+                dean_inbox()
+                break
         if message != '':
             break
 
@@ -6617,7 +6908,7 @@ def respondToNotification(senderName, senderType, receiverType, receiver_name, p
             return
 
         # MESSAGE BEING SENT TO THE DEAN
-        if receiverType == "Dean" and receiver_name == None:
+        if receiverType == "Dean" and receiverName == None:
             notification = message
             received_from = f"{senderType} ({senderName})"
             sql = f"SELECT id FROM {senderType} WHERE name = %s"
@@ -6634,7 +6925,7 @@ def respondToNotification(senderName, senderType, receiverType, receiver_name, p
             notification = message
             received_from = f"{senderType} ({senderName})"
             sql = f"SELECT id FROM {receiverType} WHERE name = %s"
-            val = (receiver_name,)
+            val = (receiverName,)
             db.execute(sql, val)
             person_id = db.fetchall()[0][0]
 
@@ -6644,19 +6935,17 @@ def respondToNotification(senderName, senderType, receiverType, receiver_name, p
             mydb.commit()
             # CREATE CONVERSATION
             conversationInfo = {
+                'convoId': f'{senderName}({senderType}) To {receiverName}({receiverType})',
                 'date': now,
                 'senderType': senderType,
                 'senderName': senderName,
-                'senderMessage': message,
-
                 'preMessage': previous_message,
-
-                'receivedFrom': f'{receiver_name}'
+                'senderMessage': message,
+                'receivedFrom': f'{receiverName}'
             }
 
-            createConversation(message, previous_message)
 
-
+            createConversation(conversationInfo)
 
         while True:
             print()
@@ -6675,7 +6964,12 @@ def respondToNotification(senderName, senderType, receiverType, receiver_name, p
                     return
 
     elif confirmation == "no":
-        student_inbox()
+        if senderType == "Student":
+            student_inbox()
+        elif senderType == "Professor":
+            professor_inbox()
+        elif senderType == "Dean":
+            dean_inbox()
 def extractNameFromNotification(notification: str):
     try:
         receiver_name = notification[indexOf(notification, '(') + 1: indexOf(notification, ')')]
@@ -6688,6 +6982,117 @@ def extractNameFromNotification(notification: str):
 
     return {"receiverName": receiver_name, "Type": type}
 
+
+# CREATE CONVERSATION
+def createConversation(conversationInfo):
+    # ADD CONVERSATION
+    convoId = conversationInfo['convoId']
+    date = conversationInfo['date']
+    senderType = conversationInfo['senderType']
+    senderName = conversationInfo['senderName']
+    preMessage = conversationInfo['preMessage']
+    senderMessage = conversationInfo['senderMessage']
+    receivedFrom = conversationInfo['receivedFrom']
+
+
+
+    sql = "INSERT INTO Conversations (convoId, date, preMessage, senderType, senderName, senderMessage, receivedFrom)" \
+          "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    val = (convoId, date, preMessage, senderType, senderName, senderMessage, receivedFrom)
+    db.execute(sql, val)
+    mydb.commit()
+
+def convo_view(convoId, user, respondOnOpen=False):
+    print("CONVERSATION - Press (C) To Cancel")
+    print("-" * len(convoId))
+    print(convoId)
+    print("-" * len(convoId))
+    print()
+    sql = "SELECT * FROM Conversations WHERE convoID = %s"
+    val = (convoId,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return
+
+    received_from = ''
+    showDates = False
+    for item in results:
+        print()
+        date = item[1]
+        receivedFrom =  item[-1]
+        receiverMessages = item[2]
+        userMessages = item[5]
+        if receivedFrom != None:
+            received_from = receivedFrom
+        if showDates:
+            print(date)
+
+        if receiverMessages != None:
+            print(f'[{receivedFrom}]: {receiverMessages}')
+        # print()
+        print()
+        print(f"[You]: {userMessages}")
+
+    if respondOnOpen:
+        if user == 'Dean':
+            db_table = 'dean_notification'
+        elif user == 'Professor':
+            db_table = 'professor_notification'
+        elif user == 'Student':
+            db_table ='student_notification'
+        senderName = getSenderInfo(convoId)['Name']
+        senderType = getSenderInfo(convoId)['Type']
+        like_query = f'%{received_from}%'
+        sql = f"SELECT notification FROM {db_table} WHERE received_from LIKE %s"
+        val = (like_query, )
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            print()
+        print()
+        if received_from != '':
+            last_message = results[-1][0]
+            if receiverMessages != last_message:
+                print(f'[{received_from}]: {last_message}')
+        else:
+            last_message = None
+        while True:
+            print()
+            message = input("Enter Message: ")
+            if message.lower() == 'c':
+                clear()
+                view_all_conversations(senderName, user)
+                break
+            if message != '':
+                break
+        # CREATE CONVERSATION
+        conversationInfo = {
+            'convoId': convoId,
+            'date': now,
+            'senderType': senderType,
+            'senderName': senderName,
+            'preMessage': last_message,
+            'senderMessage': message,
+            'receivedFrom': received_from if received_from != '' else None
+        }
+        createConversation(conversationInfo)
+        if senderType == 'Student':
+            pass
+
+        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+        val = (message, f"{senderType} ({senderName})", now, )
+        db.execute(sql, val)
+        mydb.commit()
+    # print(f"Last msg: {}")
+
+def getSenderInfo(convoID):
+    senderInfo = {}
+    name = f'{convoID.split()[0]}' + ' ' +  convoID.split()[1][:indexOf(convoID.split()[1],'(', 1)]
+    senderInfo.update({'Name': name})
+    type = convoID[indexOf(convoID, '(', 1)+1:indexOf(convoID, ')', 1)]
+    senderInfo.update({'Type': type})
+    return senderInfo
 
 # VIEW ALL COURSES
 def view_all_courses_stu():
@@ -7185,7 +7590,15 @@ def capitalize(word):
 
     word_to_return = word_to_return.rstrip()
     return word_to_return
-def indexOf(string, index_of):
+def indexOf(string, index_of, specific_index=None):
+    if specific_index != None:
+        all_occurrences = []
+
+        for i in range(len(string)):
+            if string[i] == index_of:
+                all_occurrences.append(i)
+
+        return all_occurrences[specific_index - 1] if len(all_occurrences) != 0 else None
     for i in range(len(string)):
         if string[i] == index_of:
             return i
