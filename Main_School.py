@@ -19,6 +19,7 @@ from Course import Course
 from Major import Major
 from Person import Person
 from Student import Student
+from Assignments import *
 
 db_user = os.environ.get("DB_USER")
 db_password = os.environ.get('DB_PASSWORD')
@@ -1839,32 +1840,30 @@ def dean_inbox():
     if len(all_notifications) == 0:
         print("No Notifications")
 
+    terminal_size = os.get_terminal_size().columns
     for i in range(len(all_notifications)):
-        # NORMAL MESSAGE LENGTH
-        if len(all_notifications[i][1]) <= 188:
-            # AUTO FIT THE BROKEN LINES
-            max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2]) + 3])
-            if max_len_of_attributes == len(all_notifications[i][1]):
-                broken_line_added = "-" * len("Message: ")
-            else:
-                broken_line_added = "-" * len("Received From: Id:")
+        # AUTO FIT THE BROKEN LINES
+        message_len = len(all_notifications[i][1]) + len('Message: ')
+        received_from_len = len(all_notifications[i][2]) + len('Received From: ') + len(f' Id: {str(all_notifications[i][0])}')
 
-            print("-" * max_len_of_attributes + broken_line_added)
-        # MESSAGE LENGTH EXCEEDED LIMIT
+        max_len_of_attributes = max([message_len, received_from_len])
+
+        if max_len_of_attributes > terminal_size:
+            broken_line_added = '-' * terminal_size
         else:
-            print("-" * 109 + "---------\n")
+            if max_len_of_attributes == message_len:
+                broken_line_added = '-' * message_len
+            else:
+                broken_line_added = '-' * received_from_len
 
+        print(broken_line_added)
         print(f"Id: {all_notifications[i][0]}")
         print(f"Date: {all_notifications[i][3]}")
         print(f"Received From: {all_notifications[i][2]} Id: {all_notifications[i][4]}")
         print(f"Message: {all_notifications[i][1]}")
-        # NORMAL MESSAGE LENGTH
-        if len(all_notifications[i][1]) <= 188:
-            print("-" * max_len_of_attributes + broken_line_added)
-        # MESSAGE LENGTH EXCEEDED LIMIT
-        else:
-            print("-" * 109 + "---------\n")
+        print(broken_line_added)
         print()
+        
 
     while True:
         print()
@@ -3893,7 +3892,11 @@ def ProfessorMenu(name):
     clear()
     update_student_grades()
     # GETTING INBOX COUNT
-    Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+    try:
+        Prof = Professor(prof_name.split()[0], prof_name.split()[1], None, None, None, None, None)
+    except:
+        Prof = Professor(name.split()[0], name.split()[1], None, None, None, None, None)
+
     sql = "SELECT COUNT(*) FROM professor_notification WHERE prof_id = %s"
     val = (Prof.getID(), )
     db.execute(sql, val)
@@ -4191,7 +4194,7 @@ def select_course_prof(course_name):
             elif back == "v":
                 view_student_grade_for_course(course_name)
             elif back == "m":
-                ProfessorMenu(None)
+                ProfessorMenu(prof_name)
 
     # GENERIC
     while True:
@@ -4838,25 +4841,28 @@ def professor_inbox():
     if len(all_notifications) == 0:
         print("No Notifications")
 
-
+    terminal_size = os.get_terminal_size().columns
     for i in range(len(all_notifications)):
-        # AUTO FIT THE BROKEN LINES
-        max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2])])
-        if max_len_of_attributes > 120:
-            max_len_of_attributes = 120
-            broken_line_added = ''
-        else:
-            if max_len_of_attributes == len(all_notifications[i][1]):
-                broken_line_added = "-" * len("Message: ")
-            else:
-                broken_line_added = "-" * len("Received From: ")
+       # AUTO FIT THE BROKEN LINES
+        message_len = len(all_notifications[i][1]) + len('Message: ')
+        received_from_len = len(all_notifications[i][2]) + len('Received From: ')
 
-        print("-" * max_len_of_attributes + broken_line_added)
+        max_len_of_attributes = max([message_len, received_from_len])
+
+        if max_len_of_attributes > terminal_size:
+            broken_line_added = '-' * terminal_size
+        else:
+            if max_len_of_attributes == message_len:
+                broken_line_added = '-' * message_len
+            else:
+                broken_line_added = '-' * received_from_len
+
+        print(broken_line_added)
         print(f"Id: {all_notifications[i][0]}")
         print(f"Date: {all_notifications[i][3]}")
         print(f"Received From: {all_notifications[i][2]}")
         print(f"Message: {all_notifications[i][1]}")
-        print("-" * max_len_of_attributes + broken_line_added)
+        print(broken_line_added)
         print()
 
     while True:
@@ -4978,37 +4984,83 @@ def extract_stu_id(message):
 # OPEN SUBMISSION
 def prof_open_submission(stu_id, assign_id):
     clear()
+    submissionMessage = getSubmissionMessage(assign_id)
     print("OPEN SUBMISSION")
     print("---------------")
     print()
-    # GET THE ASSIGNMENT QUESTIONS
-    sql = "SELECT questions, course_name FROM assignments WHERE id = %s"
-    val = (assign_id,)
-    db.execute(sql, val)
-    results = db.fetchall()
-    if len(results) == 0:
-       submission_loading_error()
-    # assign_questions = results
-    assign_questions = [results[i][0] for i in range(len(results))]
-    course_name = results[0][1]
+    if submissionMessage != None:
+        print("-"*len(submissionMessage))
+        print(submissionMessage)
+        print("-" * len(submissionMessage))
+        print()
 
-    # GET THE ASSIGNMENT ANSWERS
-    sql = "SELECT answers FROM assignment_submissions WHERE stu_id = %s"
-    val = (stu_id,)
+    # GET THE ASSIGNMENT QUESTIONS
+    sql = "SELECT * FROM assignments WHERE id = %s"
+    val = (assign_id, )
     db.execute(sql, val)
     results = db.fetchall()
     if len(results) == 0:
         submission_loading_error()
-    assign_answers = results[0][0].rstrip()
-    assign_answers = assign_answers.split('\n\n')
+    if assignmentIsShortAnswer(results):
+        # GET THE ASSIGNMENT QUESTIONS
+        assign_questions = [results[i][5] for i in range(len(results))]
+        course_name = results[0][13]
+        # GET THE ASSIGNMENT ANSWERS
+        sql = "SELECT answers FROM assignment_submissions WHERE stu_id = %s AND assignment_id = %s"
+        val = (stu_id, assign_id)
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            submission_loading_error()
+        assign_answers = results[0][0].rstrip()
+        assign_answers = assign_answers.split('\n\n')
 
-    for i in range(len(assign_questions)):
-        print(f"{i+1}.{assign_questions[i]}")
-        print(f"{assign_answers[i][2:]}")
-        print()
+        for i in range(len(assign_questions)):
+            print(f"{i + 1}.{assign_questions[i]}")
+            print(f"Student Answer: {assign_answers[i][2:]}")
+            print()
 
-    assign_student_grade(stu_id, course_name)
+        assign_student_grade(stu_id, course_name, prof_name)
 
+    elif assignmentIsMixed(results):
+        # GET THE ASSIGNMENT QUESTIONS
+        assign_questions = [results[i][5] for i in range(len(results))]
+        course_name = results[0][13]
+
+        # GET THE ASSIGNMENT ANSWER PROMPTS
+        # DICT WITH QUESTION_NUM AS KEY AND ANSWERS PROMPTS AS VALUE
+        assign_prompts = {results[i][6]:results[i][7] for i in range(len(results)) if results[i][6] != None and results[i][7] != None}
+        # assign_prompts = [results[i][7] for i in range(len(results)) if results[i][7] != None]
+        sql = "SELECT answers FROM assignment_submissions WHERE stu_id = %s AND assignment_id = %s"
+        val = (stu_id, assign_id)
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            submission_loading_error()
+        # GET THE ASSIGNMENT ANSWERS
+        assign_answers = results[0][0].rstrip()
+        # SEPARATE THE QUESTION NUMBERS FROM THE STRING OF ANSWERS AND CREATE A DICT WITH KEY = THE QUESTION NUMBER AND VALUE = The QUESTION
+        question_num = [assign_answers[i] for i in range(len(assign_answers)) if assign_answers[i].isdigit() and assign_answers[i+1] == '.']
+        assign_answers = {int(question_num[i]): assign_answers.split('\n\n')[i][2:] for i in range(len(question_num))}
+
+        studentMultipleChoiceAnswers = eval(getStudentMultipleChoiceAnswers(submissionMessage))
+        # print(studentMultipleChoiceAnswers[2])
+
+        for i in range(len(assign_questions)):
+            current_question_num = i+1
+            current_question = assign_questions[i]
+            if questionIsShortAnswer(assign_id, i+1):
+                print(f"{current_question_num}.{current_question}")
+                print(f"Student Answer: {assign_answers[current_question_num]}")
+                print()
+            else:
+                print(f"{i + 1}.{current_question}")
+                print(assign_prompts[current_question_num])
+                # print(studentMultipleChoiceAnswers[question_num])
+                print(f'Student Answer: {studentMultipleChoiceAnswers[current_question_num]}')
+                print()
+
+        assign_student_grade(stu_id, course_name, prof_name)
 
 
     while True:
@@ -5018,14 +5070,41 @@ def prof_open_submission(stu_id, assign_id):
             professor_inbox()
             break
 
+
+def getSubmissionMessage(assign_id):
+    sql = "SELECT message FROM assignment_submissions WHERE assignment_id = %s"
+    val = (assign_id,)
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return None
+    return results[0][0]
+
+def getStudentMultipleChoiceAnswers(sub_message):
+    student_answers = ''
+    i = 0
+    while i < len(sub_message):
+        if sub_message[i] == '{':
+            start = True
+            while start:
+                student_answers += sub_message[i]
+                if sub_message[i] == '}':
+                    start = False
+                i += 1
+        i += 1
+
+    return student_answers
+
+
+
 def submission_loading_error():
     while True:
         print()
         error = input("Error Loading Submission. Press (B) To Go Back: ").lower()
         if error == "b":
-            ProfessorMenu(None)
+            ProfessorMenu(prof_name)
             break
-def assign_student_grade(stu_id, course_name):
+def assign_student_grade(stu_id, course_name, prof_name):
     while True:
         print()
         stu_grade = input("Assign Their Grade(%): ")
@@ -5050,9 +5129,9 @@ def assign_student_grade(stu_id, course_name):
             break
 
     if confirmation == "yes":
-        update_grade_book(course_name, stu_id, stu_grade)
+        update_grade_book(course_name, stu_id, stu_grade, prof_name)
     elif confirmation == "no":
-        ProfessorMenu(None)
+        ProfessorMenu(prof_name)
 
 
 # FILTER PROFESSOR NOTIFICATIONS
@@ -5260,10 +5339,12 @@ def prof_create_assignment():
         else:
             print("Invalid Choice")
 
-    createAssignment(courses[int(prof_choice)])
+    createAssignmentPrompt(courses[int(prof_choice)])
+
+
 
 # CREATE ASSIGNMENT
-def createAssignment(course_name):
+def createAssignmentPrompt(course_name):
     clear()
     print("CREATE ASSIGNMENT")
     print(now)
@@ -5284,11 +5365,9 @@ def createAssignment(course_name):
         print()
         assign_choice = input("Choose An Option: ").lower()
         if assign_choice == "c":
-            ProfessorMenu(None)
-        if assign_choice == "1":
-            pass
-            break
-        # MULTIPLE CHOICE OPTIONS
+            ProfessorMenu(prof_name)
+        
+        # MULTIPLE CHOICE QUESTIONS
         elif assign_choice == "2" or assign_choice == "5" or assign_choice == "8":
             if assign_choice == "2":
                 assignment_type = "Exam(Multiple Choice)"
@@ -5296,7 +5375,9 @@ def createAssignment(course_name):
                 assignment_type  = "Test(Multiple Choice)"
             elif assign_choice == "8":
                 assignment_type = "Quiz(Multiple Choice)"
-            create_multiple_choice_assignment(course_name, assignment_type)
+            Assignment = MultipleChoiceAssignment(course_name, assignment_type, prof_name)
+            Assignment.createAssignment()
+
         # SHORT ANSWER QUESTIONS
         elif assign_choice == "1" or assign_choice == "4" or assign_choice == "7":
             if assign_choice == "1":
@@ -5305,344 +5386,19 @@ def createAssignment(course_name):
                 assignment_type = "Test(Short Answer)"
             elif assign_choice == "7":
                 assignment_type = "Quiz(Short Answer)"
-            create_short_answer_assignment(course_name, assignment_type)
+            Assignment = ShortAnswerAssignment(course_name, assignment_type, prof_name)
+            Assignment.createAssignment()
 
-# MULTIPLE CHOICE ASSIGNMENT
-def create_multiple_choice_assignment(course_name, assignment_type):
-    clear()
-    # GET PROFESSOR ID
-    sql = "SELECT id FROM Professor WHERE name = %s"
-    val = (prof_name, )
-    db.execute(sql, val)
-    prof_id = db.fetchall()[0][0]
-    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
-    print(f"CREATING {course_name} {assignment_type.upper()}")
-    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
-    print()
-    assign_type = assignment_type[:indexOf(assignment_type, "(")]
-    # TITLE
-    while True:
-        print()
-        assignment_title = input(f"{assign_type} Title: ")
-        if assignment_title.lower() == "c":
-            createAssignment(course_name)
-            break
-        if assignmentAlreadyExist(assignment_title):
-            print("That Assignment Has Already Been Created")
-        else:
-            if assignment_title != '':
-                break
-    # NUMBER OF QUESTIONS
-    while True:
-        print()
-        num_questions = input("Number Of Questions: ")
-        if num_questions.lower() == "c":
-            createAssignment(course_name)
-            break
-        if not num_questions.isdigit():
-            print("Must Be A Number")
-        else:
-            num_questions = int(num_questions)
-            break
-    # DURATION
-    while True:
-        print()
-        duration = input("Duration(Mins): ").lower()
-        if duration == "c":
-            createAssignment(course_name)
-            break
-        if not duration.isdigit():
-            print("Duration Must Be A Number")
-        else:
-            break
-    # DUE DATE
-    while True:
-        formatError = False
-        print()
-        due_date = input("Due Date(MM/DD/YYYY): ")
-        if due_date == "c":
-            createAssignment(course_name)
-            break
-        if validateDueDate(due_date) == 0:
-            formatError = True
-            print("Invalid Date Format")
-        elif validateDueDate(due_date) == -1:
-            formatError = True
-            print("Invalid Month")
-        elif validateDueDate(due_date) == -2:
-            formatError = True
-            print("Invalid Day")
-        elif validateDueDate(due_date) == -3:
-            formatError = True
-            print("That Date Has Already Passed")
-        if not formatError:
-            break
-    # DESCRIPTION
-    print()
-    assignment_description = input(f"{assign_type} Description(Optional): ")
-    if assignment_description.lower() == "c":
-        createAssignment(course_name)
-
-    questions = {}
-    answer_prompts = {}
-    correct_answers = {}
-    answer_choices = ['a.', 'b.', 'c.', 'd.']
-    for i in range(1, num_questions + 1):
-        print()
-        # GET THE QUESTION
-        assigned_questions = input(f"Question: {i}: ")
-        if assigned_questions.lower() == "c":
-            ProfessorMenu(None)
-        questions.update({i: assigned_questions})
-        tmp_prompt_answer = {}
-        # GET THE ASSIGNED PROMPTS
-        for choice in answer_choices:
-            assigned_ans_prompt = input(f"{choice}: ")
-            if assigned_ans_prompt.lower() == "c":
-                ProfessorMenu(None)
-            tmp_prompt_answer.update({choice: assigned_ans_prompt})
-        # STORE ALL THE PROMPT ANSWERS
-        prompt_ans_to_store = f"a. {tmp_prompt_answer['a.']}\nb. {tmp_prompt_answer['b.']}\nc. {tmp_prompt_answer['c.']}\nd. {tmp_prompt_answer['d.']}"
-        answer_prompts.update({i: prompt_ans_to_store})
-        # GET THE CORRECT ANSWER
-        while True:
-            correct_answer = input("Enter The Correct Answer: ").lower()
-            correct_answer += '.'
-            if correct_answer not in answer_choices:
-                print("Invalid Choice. Enter a, b, c, or d")
-                print()
-            else:
-                correct_answers.update({i: correct_answer})
-                break
-
-    clear()
-    print("------------")
-    print(f"{assign_type} CREATED")
-    print("------------")
-    print()
-    if assignment_description != '':
-        print("-" * len(assignment_description))
-        print(assignment_description)
-        print("-" * len(assignment_description))
-        print()
-    print(f"Duration: {duration}")
-    print(f"Due Date: {due_date}")
-    print()
-    for i in range(1, num_questions +1):
-        print(questions[i])
-        print(answer_prompts[i])
-        print(f"Correct Answer: {correct_answers[i]}")
-        print()
-
-
-    # CONFIRMATION
-    while True:
-        print()
-        confirmation = input(f"CONFIRMATION: Do You Want To Save This {assign_type}? ").lower()
-        if confirmation == "yes" or confirmation == "no":
-            break
-
-    if confirmation == "yes":
-        db.execute("SELECT id FROM assignments")
-        results = db.fetchall()
-        if len(results) == 0:
-            assign_id = 1
-        else:
-            assign_id = results[len(results) - 1][0] + 1
-
-        for question in questions:
-            # QUESTIONS
-            question_num = question
-            Questions = questions[question]
-            # ANSWERS
-            answer_prompt_num = question
-            answer_prompt = answer_prompts[question]
-            # CORRECT ANSWERS
-            correct_answer_num = question
-            correct_answer = correct_answers[question]
-
-            sql = "INSERT INTO assignments (id, assignment_type, title, description, question_num, questions, answer_prompts_num, answer_prompts, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name)" \
-                  "VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            val = (assign_id, assign_type, assignment_title, assignment_description, question_num, Questions,
-                   answer_prompt_num, answer_prompt, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name)
-            db.execute(sql, val)
-            mydb.commit()
-
-        while True:
-            print()
-            back = input(f"{assign_type} Saved. Press (M) To Return To Professor Menu: ").lower()
-            if back == "m":
-                ProfessorMenu(None)
-    elif confirmation == "no":
-        ProfessorMenu(None)
-# SHORT ANSWER ASSIGNMENT
-def create_short_answer_assignment(course_name, assignment_type):
-    clear()
-    # GET PROFESSOR ID
-    sql = "SELECT id FROM Professor WHERE name = %s"
-    val = (prof_name,)
-    db.execute(sql, val)
-    prof_id = db.fetchall()[0][0]
-    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
-    print(f"CREATING {course_name} {assignment_type.upper()}")
-    print("--------" + "-" * len(course_name) + "-" * len(assignment_type) + "--")
-    print()
-    assign_type = assignment_type[:indexOf(assignment_type, "(")]
-    # TITLE
-    while True:
-        print()
-        assignment_title = input(f"{assign_type} Title: ")
-        if assignment_title.lower() == "c":
-            createAssignment(course_name)
-            break
-        if assignmentAlreadyExist(assignment_title):
-            print("That Assignment Has Already Been Created")
-        else:
-            if assignment_title != '':
-                break
-    # NUMBER OF QUESTIONS
-    while True:
-        print()
-        num_questions = input("Number Of Questions: ")
-        if num_questions.lower() == "c":
-            createAssignment(course_name)
-            break
-        if not num_questions.isdigit():
-            print("Must Be A Number")
-        else:
-            num_questions = int(num_questions)
-            break
-    # DURATION
-    while True:
-        print()
-        duration = input("Duration(Mins): ").lower()
-        if duration == "c":
-            createAssignment(course_name)
-            break
-        if not duration.isdigit():
-            print("Duration Must Be A Number")
-        else:
-            break
-    # DUE DATE
-    while True:
-        formatError = False
-        print()
-        due_date = input("Due Date(MM/DD/YYYY): ")
-        if due_date == "c":
-            createAssignment(course_name)
-            break
-        if validateDueDate(due_date) == 0:
-            formatError = True
-            print("Invalid Date Format")
-        elif validateDueDate(due_date) == -1:
-            formatError = True
-            print("Invalid Month")
-        elif validateDueDate(due_date) == -2:
-            formatError = True
-            print("Invalid Day")
-        elif validateDueDate(due_date) == -3:
-            formatError = True
-            print("That Date Has Already Passed")
-        if not formatError:
-            break
-    # DESCRIPTION
-    print()
-    assignment_description = input(f"{assign_type} Description(Optional): ")
-    if assignment_description.lower() == "c":
-        createAssignment(course_name)
-
-    questions = {}
-    for i in range(1, num_questions + 1):
-        print()
-        # GET THE QUESTION
-        assigned_questions = input(f"Question: {i}: ")
-        if assigned_questions.lower() == "c":
-            ProfessorMenu(None)
-        questions.update({i: assigned_questions})
-
-
-    clear()
-    print("------------")
-    print(f"{assign_type} CREATED")
-    print("------------")
-    print()
-    if assignment_description != '':
-        print("-" * len(assignment_description))
-        print(assignment_description)
-        print("-" * len(assignment_description))
-        print()
-    print(f"Duration: {duration}")
-    print(f"Due Date: {due_date}")
-    print()
-    for i in range(1, num_questions + 1):
-        print(f"{i}.{questions[i]}")
-        print()
-
-    # CONFIRMATION
-    while True:
-        print()
-        confirmation = input(f"CONFIRMATION: Do You Want To Save This {assign_type}? ").lower()
-        if confirmation == "yes" or confirmation == "no":
-            break
-
-    if confirmation == "yes":
-        db.execute("SELECT id FROM assignments")
-        results = db.fetchall()
-        if len(results) == 0:
-            assign_id = 1
-        else:
-            assign_id = results[len(results) - 1][0] + 1
-
-        for question in questions:
-            # QUESTIONS
-            question_num = question
-            Questions = questions[question]
-
-            sql = "INSERT INTO assignments (id, assignment_type, title, description, question_num, questions, prof_id, duration, due_date, course_name)" \
-                  "VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            val = (assign_id, assign_type, assignment_title, assignment_description, question_num, Questions, prof_id, duration, due_date, course_name)
-            db.execute(sql, val)
-            mydb.commit()
-
-        while True:
-            print()
-            back = input(f"{assign_type} Saved. Press (M) To Return To Professor Menu: ").lower()
-            if back == "m":
-                ProfessorMenu(None)
-    elif confirmation == "no":
-        ProfessorMenu(None)
-def validateDueDate(due_date):
-    tmp_date = due_date
-    all_months = {"January", "February", "March", "April", "May", "June", "July", "August",
-                  "September", "October", "November", "December"}
-
-    try:
-        due_date = due_date.split()
-        due_date_month = due_date[0]
-        due_date_day = int(due_date[1].replace(',', ''))
-        due_date_year = int(due_date[2])
-    except:
-        return 0
-
-    # INVALID MONTH
-    if due_date_month not in all_months:
-        return -1
-    # INVALID DAY
-    if due_date_day < 1 or due_date_day > 31 if due_date_month != "February" else 28:
-        return -2
-    # DATE HAS PASSED
-    if isDue(tmp_date):
-        return -3
-
-    return 1
-def assignmentAlreadyExist(title):
-    sql =  "SELECT * FROM assignments WHERE title = %s"
-    val = (title,)
-    db.execute(sql, val)
-    results = db.fetchall()
-    if len(results) == 0:
-        return False
-    return True
+        # MIXED ANSWER QUESTIONS
+        elif assign_choice == "3" or assign_choice == "6" or assign_choice == "9":
+            if assign_choice == "3":
+                assignment_type = "Exam(Mixed)"
+            elif assign_choice == "6":
+                assignment_type = "Test(Mixed)"
+            elif assign_choice == "9":
+                assignment_type = "Quiz(Mixed)"
+            Assignment = MixedAssignment(course_name, assignment_type, prof_name)
+            Assignment.createAssignment()
 
 
 # ISSUE ASSIGNMENT
@@ -5674,13 +5430,13 @@ def prof_issue_assignment():
     assign_inc = {}
     for i in range(len(all_created_assignments)):
         assign_inc.update({i+1: all_created_assignments[i]})
-        print(f"{i + 1} - {all_created_assignments[i]} ({all_assignment_types[i]})")
+        print(f"{i + 1} - {all_created_assignments[i]} [{all_assignment_types[i]}]")
 
     while True:
         print()
         assign_to_issue = input("Select An Assignment: ")
         if assign_to_issue.lower() == "c":
-            ProfessorMenu(None)
+            ProfessorMenu(prof_name)
         elif assign_to_issue.lower() == "d":
             while True:
                 print()
@@ -5731,9 +5487,9 @@ def prof_issue_assignment():
             print()
             back = input("Assignment Issued. Press (M) To Return To Professor Menu: ").lower()
             if back == "m":
-                ProfessorMenu(None)
+                ProfessorMenu(prof_name)
     elif confirmation == "no":
-        ProfessorMenu(None)
+        ProfessorMenu(prof_name)
 
 
 
@@ -5743,39 +5499,827 @@ def open_assignment(assignment_title):
     val = (assignment_title,)
     db.execute(sql, val)
     results = db.fetchall()
+    # NO ASSIGNMENT FOUND
+    if len(results) == 0:
+        unable_to_open_assign()
     title = results[0][2]
     description = results[0][3]
     duration = results[0][11]
     due_date = results[0][12]
     num_assign_questions = len(results)
-    # RETRIEVE THE CORRECT ANSWERS
-    assign_answers = {}
-    for i in range(len(results)):
-        assign_answers.update({results[i][8]: results[i][9]})
+    
 
-    print(f"<<<<<<<<<< {title} >>>>>>>>>>")
-    print()
-    if description != '':
-        print("-" * len(description))
-        print(description)
-        print("-" * len(description))
+    if assignmentIsShortAnswer(results):
+        print(f"<<<<<<<<<< {title} >>>>>>>>>>")            
         print()
-    print(f"Duration: {duration} Mins")
-    print(f"Due Date: {due_date}")
-    print()
-    for i in range(num_assign_questions):
-        print(f"{i + 1}.{results[i][5]}")
-        print(results[i][7])
-        print(f"Correct Answer: {assign_answers[i+1]}")
+        if description != '':
+            print("-" * len(description))
+            print(description)
+            print("-" * len(description))
+            print()
+        print(f"Duration: {duration} Mins")
+        print(f"Due Date: {due_date}")
         print()
+        for i in range(num_assign_questions):
+            question_num = (i+1)
+            current_question = results[i][5]
+            print(f'{question_num}.{current_question}')
+            print()
 
+        while True:
+            print()
+            back = input("Press (I) To Issue This Assignment:\nPress (E) To Edit This Assignment:\nPress (C) To Cancel: ").lower()
+            if back == "i":
+                return
+            elif back == "e":
+                prof_edit_assignment(results)
+            elif back == "c":
+                prof_issue_assignment()
+                break
+
+    elif assignmentIsMixed(results):
+        print(f"<<<<<<<<<< {title} >>>>>>>>>>")            
+        print()
+        if description != '':
+            print("-" * len(description))
+            print(description)
+            print("-" * len(description))
+            print()
+        print(f"Duration: {duration} Mins")
+        print(f"Due Date: {due_date}")
+        print()
+        for i in range(len(results)):
+            # DISPLAY THE MULTIPLCE CHOICE QUESTION
+            if results[i][6] != None and results[i][7] != None and results[i][8] != None and results[i][9] != None:
+                multiple_choice_questions = results[i][5]
+                answer_prompts = results[i][7]
+                correct_answers = results[i][9]
+                print(f'{i+1}.{multiple_choice_questions}')
+                print(answer_prompts)
+                print(f"Correct Answer: {correct_answers}")
+                print()
+            # DISPLAY THE SHORT ANSWER QUESTION
+            else:
+                short_ans_questions = results[i][5]
+                print(f"{i+1}.{short_ans_questions}")
+                print()
+
+        while True:
+            print()
+            back = input("Press (I) To Issue This Assignment:\nPress (E) To Edit This Assignment:\nPress (C) To Cancel: ").lower()
+            if back == "i":
+                return
+            if back == "e":
+                prof_edit_assignment(results)
+                break
+            elif back == "c":
+                prof_issue_assignment()
+                break
+
+
+    elif assignmentIsMultipleChoice(results):
+        # RETRIEVE THE CORRECT ANSWERS
+        assign_answers = {}
+        for i in range(len(results)):
+            current_question_num, correct_answer = results[i][8], results[i][9]
+            assign_answers.update({current_question_num: correct_answer})
+
+        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
+        print()
+        if description != '':
+            print("-" * len(description))
+            print(description)
+            print("-" * len(description))
+            print()
+        print(f"Duration: {duration} Mins")
+        print(f"Due Date: {due_date}")
+        print()
+        for i in range(num_assign_questions):
+            answer_prompts = results[i][7]
+            question_num = i+1
+            current_question = results[i][5]
+
+            print(f"{question_num}.{current_question}")
+            print(answer_prompts)
+            print(f"Correct Answer: {assign_answers[i+1]}")
+            print()
+
+        while True:
+            print()
+            back = input("Press (I) To Issue This Assignment:\nPress (E) To Edit This Assignment:\nPress (C) To Cancel: ").lower()
+            if back == "i":
+                return
+            elif back == "e":
+                prof_edit_assignment(results)
+                break
+            elif back == "c":
+                prof_issue_assignment()
+                break
+# EDIT ASSIGNMENT
+def prof_edit_assignment(assignment_info):
+    print()
+    assign_id = assignment_info[0][0]
+    title = assignment_info[0][2]
+    description = assignment_info[0][3]
+    questions = [assignment_info[i][5] for i in range(len(assignment_info))]
+    answer_prompts = [assignment_info[i][7] for i in range(len(assignment_info))]
+    correct_answers = [assignment_info[i][9] for i in range(len(assignment_info))]
+    duration = assignment_info[0][11]
+    due_date = assignment_info[0][12]
+    # assignment_type = 'Short Answer' if assignmentIsShortAnswer(assignment_info) else 'Multiple Choice' if assignmentIsMultipleChoice(assignment_info) else 'Mixed'
+    num_assign_questions = len(assignment_info)
+
+    print("---------------")
+    print("EDIT ASSIGNMENT")
+    print("---------------")
+    print()
+    print("Press (C) To Cancel")
+    print()
+    print("EDITS AVAILABLE")
+    print()
+    print("1 - Edit Title")
+    print("2 - Edit Description")
+    print("3 - Edit Duration")
+    print("4 - Edit Due Date")
+    print("5 - Edit Questions")
+    print()
+    print("6 - Edit Answer Prompts")
+    print("7 - Edit Correct Answer")
+    print("8 - Edit Question Type")
+    print("9 - Add Question")
+    print("10 - Delete Question")
+    print()
     while True:
         print()
-        back = input("Press (I) To Issue This Assignment:\nPress (C) To Cancel: ").lower()
-        if back == "i":
-            return
-        elif back == "c":
+        edit_to_make = input("Choose An Option: ")
+        if edit_to_make == 'c':
             prof_issue_assignment()
+            break
+        if edit_to_make in ['1','2','3','4','5','6','7','8', '9','10']:
+            break
+    if edit_to_make == '1':
+        editAssignment('Title', 'title', title, assign_id)
+    elif edit_to_make == '2':
+        editAssignment('Description', 'description', description, assign_id)
+    elif edit_to_make == '3':
+        editAssignment('Duration', 'duration', duration, assign_id)
+    elif edit_to_make == '4':
+        editAssignment('Due Date', 'due_date', due_date, assign_id)
+    elif edit_to_make == '5':
+        editAssignment('Question', 'questions', questions, assign_id)
+    elif edit_to_make == '6':
+        if assignmentIsShortAnswer(assignment_info):
+            while True:
+                print()
+                error = input("This Edit Is Only Available For Mixed And Multiple Choice Assignments. Press (B) To Go Back: ").lower()
+                if error == 'b':
+                    prof_edit_assignment(assignment_info)
+                    break
+        else:
+            editAssignment('Answer Prompt', 'answer_prompts', answer_prompts, assign_id, num_assign_questions)
+    elif edit_to_make == '7':
+        if assignmentIsShortAnswer(assignment_info):
+             while True:
+                print()
+                error = input("This Edit Is Only Available For Mixed And Multiple Choice Assignments. Press (B) To Go Back: ").lower()
+                if error == 'b':
+                    prof_edit_assignment(assignment_info)
+                    break
+
+        else:
+             editAssignment('Correct Answer', 'correct_answer', correct_answers, assign_id, num_assign_questions)
+    elif edit_to_make == '8':
+        editAssignment('Question Type', 'question_type', None, assign_id, num_assign_questions)
+    elif edit_to_make == '9':
+        editAssignment('Add Question', None, assignment_info, assign_id, num_assign_questions)
+    elif edit_to_make == '10':
+        editAssignment('Delete Question', None, assignment_info, assign_id, num_assign_questions)
+
+
+
+def editAssignment(editToMake, columnName, oldValue, assign_id, numQuestions=None):
+    # SPECIAL EDITS
+    if editToMake == 'Due Date':
+        print()
+        print("EDIT DUE DATE")
+        print("-------------")
+        print()
+        print(f"Current Due Date: {oldValue}")
+        while True:
+            formatError = False
+            tmpAssign = Assignment()
+            validateDueDate = tmpAssign.validateDueDate
+            print()
+            newDueDate = input("Enter The New Due Date(MM/DD/YYYY): ")
+            if newDueDate.lower() == 'c':
+                prof_issue_assignment()
+                break
+            if validateDueDate(newDueDate) == 0:
+                formatError = True
+                print("Invalid Date Format")
+            elif validateDueDate(newDueDate) == -1:
+                formatError = True
+                print("Invalid Month")
+            elif validateDueDate(newDueDate) == -2:
+                formatError = True
+                print("Invalid Day")
+            elif validateDueDate(newDueDate) == -3:
+                formatError = True
+                print("That Date Has Already Passed")
+            if not formatError:
+                break
+
+        # CONFIRMATION
+        while True:
+            print()
+            confirmation = input(f"CONFIRMATION: Are You Sure You Want To Edit The Due Date Of This Assignment? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            sql = f"UPDATE assignments SET due_date = %s WHERE id = %s"
+            val = (newDueDate, assign_id)
+            db.execute(sql, val)
+            mydb.commit()
+            while True:
+                print()
+                back = input(f"Assignment Due Date Changed. Press (B) To Go Back: ").lower()
+                if back == "b":
+                    prof_issue_assignment()
+                    break
+        else:
+            prof_issue_assignment()
+
+    elif editToMake == 'Question':
+        print()
+        print("EDIT QUESTION")
+        print("-------------")
+        while True:
+            print()
+            question_num = input("Enter The Question Number: ")
+            if question_num.lower() == 'c':
+                prof_issue_assignment()
+                break
+            range_of_values = [str(i+1) for i in range(len(oldValue))]
+            if question_num not in range_of_values or not question_num.isdigit():
+                print("Invalid Question Number")
+                print()
+            else:
+                break
+        displayQuestion(assign_id, int(question_num), 'editAssignment')
+
+        while True:
+            print()
+            new_question = input("Enter The New Question: ")
+            if new_question.lower() == 'c':
+                prof_issue_assignment()
+                break
+            if new_question != '':
+                break
+        while True:
+            print()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Edit This Question? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            sql = "UPDATE assignments SET questions = %s WHERE question_num = %s AND id = %s"
+            val = (new_question, int(question_num), assign_id)
+            db.execute(sql, val)
+            mydb.commit()
+            while True:
+                print()
+                back = input(f"Assignment {editToMake} Changed. Press (B) To Go Back: ").lower()
+                if back == "b":
+                    prof_issue_assignment()
+                    break
+        else:
+            prof_issue_assignment()
+
+    elif editToMake == 'Answer Prompt':
+        print()
+        print("EDIT ANSWER PROMPT")
+        print("------------------")
+        while True:
+            print()
+            question_num = input("Enter The Question Number: ")
+            if question_num.lower() == 'c':
+                prof_issue_assignment()
+                break
+            range_of_values = [str(i+1) for i in range(numQuestions)]
+            error = False
+            if question_num not in range_of_values or not question_num.isdigit():
+                error = True
+                print("Invalid Question Number")
+            if not error:
+                if questionIsShortAnswer(assign_id, int(question_num)):
+                    error = True
+                    print("That Question Is Short Answer. Only Multiple Choice Answer Prompts Can Be Changed.")
+            if not error:
+                break
+        displayQuestion(assign_id, int(question_num), 'editAssignment')
+        # CONVERT THE STRING OF OLD ANSWER PROMPTS TO A DICT
+        array_of_ans = oldValue[int(question_num)-1].split('\n')
+        old_prompt_answer = {}
+        
+        for item in array_of_ans:
+            item = item.split('.')
+            letter_prompt = item[0]
+            answer_to_prompt = item[1].lstrip()
+
+            old_prompt_answer.update({f'{letter_prompt}.': answer_to_prompt})
+        cpy_pre_prompt_answers = old_prompt_answer
+
+        
+        tmp_prompt_answer = {}
+        while True:
+            print()
+            answer_prompt_to_change = input('Which Answer Prompt Would You Like To Change? ').lower()
+            # GET ALL POSSIBLE ANSWER COMBINATIONS
+            range_of_values = ''
+            for perm in permuteString('abcd'):
+                for item in perm:
+                    range_of_values += f'{item} '
+            if answer_prompt_to_change not in range_of_values:
+                print("Invalid. Enter a,b,c or d")
+            else:
+                print()
+                for prompt in answer_prompt_to_change.split(',') if ',' in answer_prompt_to_change else answer_prompt_to_change.split():
+                    new_prompt = input(f"Enter The New Answer Prompt For {prompt}: ")
+                    tmp_prompt_answer.update({f'{prompt}.': new_prompt})
+                break
+        prompt_ans_to_store = ''
+        answer_choices = ['a.','b.','c.','d.']
+        for ans in tmp_prompt_answer:
+            cpy_pre_prompt_answers[ans] = tmp_prompt_answer[ans]
+
+        for i in range(len(cpy_pre_prompt_answers)):
+            prompt_ans_to_store += f'{answer_choices[i]} {cpy_pre_prompt_answers[answer_choices[i]]}\n'
+            
+        prompt_ans_to_store = prompt_ans_to_store[:len(prompt_ans_to_store) - 1]
+
+        while True:
+            print()
+            confirmation = input(f'CONFIRMATION: Are You Sure You Want To Change The Answer Prompt For This Question? ').lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            sql = "UPDATE assignments SET answer_prompts = %s WHERE question_num = %s AND id = %s"
+            val = (prompt_ans_to_store, int(question_num), assign_id)
+            db.execute(sql, val)
+            mydb.commit()
+            while True:
+                print()
+                back = input(f"Assignment {editToMake} Changed. Press (B) To Go Back: ").lower()
+                if back == "b":
+                    prof_issue_assignment()
+                    break
+        else:
+            prof_issue_assignment()
+
+    elif editToMake == 'Correct Answer':
+        print()
+        print("EDIT CORRECT ANSWER")
+        print("-------------------")
+        print()
+        while True:
+            print()
+            question_num = input("Enter The Question Number: ")
+            if question_num.lower() == 'c':
+                prof_issue_assignment()
+                break
+            range_of_values = [str(i+1) for i in range(numQuestions)]
+            error = False
+            if question_num not in range_of_values or not question_num.isdigit():
+                error = True
+                print("Invalid Question Number")
+            if not error:
+                if questionIsShortAnswer(assign_id, int(question_num)):
+                    error = True
+                    print("That Question Is Short Answer. Only Multiple Choice Correct Answers Can Be Changed.")
+            if not error:
+                break
+        displayQuestion(assign_id, int(question_num), 'editAssignment')
+        while True:
+            print()
+            new_correct_answer  = input("Enter The New Correct Answer: ").lower()
+            if new_correct_answer not in ['a','b','c','d']:
+                print("Invalid Correct Answer. Enter a, b, c or d")
+                print()
+            else:
+                break
+        while True:
+            print()
+            confirmation = input("CONFIRMATION: Are You Sure You Want To Edit This Correct Answer? ").lower()
+            if confirmation == "yes" or confirmation == "no":
+                break
+        if confirmation == "yes":
+            new_correct_answer += '.'
+            sql = "UPDATE assignments SET correct_answer = %s WHERE question_num = %s AND id = %s"
+            val = (new_correct_answer, int(question_num), assign_id)
+            db.execute(sql, val)
+            mydb.commit()
+            while True:
+                print()
+                back = input(f"Assignment {editToMake} Changed. Press (B) To Go Back: ").lower()
+                if back == "b":
+                    prof_issue_assignment()
+                    break
+        else:
+            prof_issue_assignment()
+
+    elif editToMake == 'Question Type':
+        print()
+        print("EDIT QUESTION TYPE")
+        print("------------------")
+        while True:
+            print()
+            question_num = input('Enter The Question Number: ')
+            if question_num.lower() == 'c':
+                prof_issue_assignment()
+                break
+            range_of_values = [str(i+1) for i in range(numQuestions)]
+            if question_num not in range_of_values:
+                print('Invalid Question Number')
+            else:
+                break
+        question_num = int(question_num)
+        displayQuestion(assign_id, question_num, 'editAssignment')
+        while True:
+            print()
+            newQuestionType = input('Enter The New Question Type: ').title()
+            if newQuestionType.lower() == 'c':
+                prof_issue_assignment()
+                break
+            if newQuestionType not in ['Short Answer', 'Multiple Choice']:
+                print("Invalid Question Type. Enter 'Multiple Choice' or 'Short Answer'")
+            else:
+                break
+
+        if newQuestionType == 'Short Answer':
+            if questionIsShortAnswer(assign_id, question_num):
+                while True:
+                    print()
+                    error = input("This Question Is Already Short Answer.\n\nPress (T) To Try Again:\nPress (B) To Go Back: ").lower()
+                    if error == 't':
+                        editAssignment(editToMake, columnName, oldValue, assign_id, numQuestions)
+                        break
+                    elif error == 'b':
+                        prof_issue_assignment()
+                        break
+            else:
+                while True:
+                    print()
+                    changeQuestion = input('Do You Want To Change The Question? ').lower()
+                    if changeQuestion in ['yes', 'no']:
+                        break
+                if changeQuestion == 'yes':
+                    while True:
+                        newQuestion = input('Enter The New Question: ')
+                        if newQuestion.lower() == 'c':
+                            prof_issue_assignment()
+                            break
+                        if newQuestion != '':
+                            break
+
+                while True:
+                    print()
+                    confirmation = input('CONFIRMATION: Are You Sure You Want To Change This Question Type? ').lower()
+                    if confirmation in ['yes', 'no']:
+                        break
+                if confirmation == 'yes':
+                    if changeQuestion == 'yes':
+                        # UPDATE QUESTION
+                        sql = 'UPDATE assignments SET questions = %s WHERE question_num = %s AND id = %s'
+                        val = (newQuestion, question_num, assign_id)
+                        db.execute(sql, val)
+                        mydb.commit()
+
+                    # SET ALL THE COLUMNS RELATED TO MULTIPLE CHOICE TO NULL
+                    columsToChange = ['answer_prompts_num', 'answer_prompts', 'correct_answer_num', 'correct_answer']
+                    for i in range(len(columsToChange)):
+                        sql = f"UPDATE assignments SET {columsToChange[i]} = %s WHERE question_num = %s AND id = %s"
+                        val = (None, question_num, assign_id)
+                        db.execute(sql, val)
+                        mydb.commit()
+
+                    while True:
+                        print()
+                        back = input('Question Type Changed. Press (B) To Go Back: ').lower()
+                        if back == 'b':
+                            prof_issue_assignment()
+                            break
+
+                elif confirmation == 'no':
+                    prof_issue_assignment()
+
+        elif newQuestionType == 'Multiple Choice':
+            if not questionIsShortAnswer(assign_id, question_num):
+                while True:
+                    print()
+                    error = input("This Question Is Already Multiple Choice.\n\nPress (T) To Try Again:\nPress (B) To Go Back: ").lower()
+                    if error == 't':
+                        editAssignment(editToMake, columnName, oldValue, assign_id, numQuestions)
+                        break
+                    elif error == 'b':
+                        prof_issue_assignment()
+                        break
+            else:
+                while True:
+                    print()
+                    changeQuestion = input('Do You Want To Change The Question? ').lower()
+                    if changeQuestion in ['yes', 'no']:
+                        break
+                if changeQuestion == 'yes':
+                    while True:
+                        newQuestion = input('Enter The New Question: ')
+                        if newQuestion.lower() == 'c':
+                            prof_issue_assignment()
+                            break
+                        if newQuestion != '':
+                            break
+                print()
+                # GET THE INFORMATION FOR THE MULTIPLE CHOICE
+                answer_choices = ['a.','b.','c.','d.']
+                prompt_answers = {}
+                for choice in answer_choices:
+                    while True:
+                        assigned_ans_prompt = input(f'{choice}:')
+                        if assigned_ans_prompt != '':
+                            break
+                    if assigned_ans_prompt.lower() == 'c':
+                        ProfessorMenu(prof_name)
+                    prompt_answers.update({choice: assigned_ans_prompt})
+                prompt_ans_to_store = f"a. {prompt_answers['a.']}\nb. {prompt_answers['b.']}\nc. {prompt_answers['c.']}\nd. {prompt_answers['d.']}"
+                # GET THE CORRECT ANSWER
+                while True:
+                    print()
+                    correct_answer = input("Enter The Correct Answer: ").lower()
+                    correct_answer += '.'
+                    if correct_answer not in answer_choices:
+                        print("Invalid Choice. Enter a,b,c, or d")
+                    else:
+                        break
+                while True:
+                    print()
+                    confirmation = input('CONFIRMATION: Are You Sure You Want To Change This Question Type? ').lower()
+                    if confirmation in ['yes', 'no']:
+                        break
+                if confirmation == 'yes':
+                    if changeQuestion == 'yes':
+                        # UPDATE QUESTION
+                        sql = 'UPDATE assignments SET questions = %s WHERE question_num = %s AND id = %s'
+                        val = (newQuestion, question_num, assign_id)
+                        db.execute(sql, val)
+                        mydb.commit()
+
+                    # ADD THE ENTRIES FOR MULTIPLE CHOICE
+                    columsToChange = {
+                        'answer_prompts_num': question_num,
+                        'answer_prompts': prompt_ans_to_store,
+                        'correct_answer_num': question_num,
+                        'correct_answer': correct_answer,
+                    }
+                    for entry in columsToChange:
+                        sql = f'UPDATE assignments SET {entry} = %s WHERE question_num = %s AND id = %s'
+                        val = (columsToChange[entry], question_num, assign_id)
+                        db.execute(sql, val)
+                        mydb.commit()
+
+                    while True:
+                        print()
+                        back = input('Question Type Changed. Press (B) To Go Back: ').lower()
+                        if back == 'b':
+                            prof_issue_assignment()
+                            break
+
+                elif confirmation == 'no':
+                    prof_issue_assignment()
+
+    elif editToMake == 'Add Question':
+        print()
+        print("ADD QUESTION")
+        print("------------")
+        print()
+        while True:
+            print()
+            newQuestionType = input(f'Enter The Question Type: ').title()
+            if newQuestionType.lower() == 'c':
+                prof_issue_assignment()
+                break
+            if newQuestionType not in ['Multiple Choice', 'Short Answer']:
+                print("Invalid Question Type. Enter 'Short Answer' Or 'Multiple Choice'")
+            else:
+                break
+        if newQuestionType == 'Short Answer':
+            print()
+            print("LAST QUESTION")
+            print("-------------")
+            displayQuestion(assign_id, numQuestions, "editAssignment")
+            print()
+            while True:
+                print()
+                newShortAnsQuestion = input('Enter The New Question: ')
+                if newShortAnsQuestion.lower() == 'c':
+                    prof_issue_assignment()
+                    break
+                if newShortAnsQuestion != '':
+                    break
+
+            while True:
+                print()
+                confirmation = input("CONFIRMATION: Are You Sure You Want To Add This Question? ").lower()
+                if confirmation in ['yes', 'no']:
+                    break
+            if confirmation == 'yes':
+                # ADD QUESTION TO THE ASSIGNMENT
+                numDatabaseColumns = 14
+
+                sql = "INSERT INTO assignments VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                assign_id, assign_type, title, description, question_num, questions, answer_prompt_num, answer_promtps, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name = [oldValue[0][i] for i in range(numDatabaseColumns)]
+                val = (assign_id, assign_type, title, description, (numQuestions+1), newShortAnsQuestion, answer_prompt_num, answer_promtps, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name)
+                db.execute(sql, val)
+                mydb.commit()
+                while True:
+                    print()
+                    back = input("Short Answer Question Added. Press (B) to Go Back:").lower()
+                    if back == 'b':
+                        prof_issue_assignment()
+                        break
+            elif confirmation == 'no':
+                prof_issue_assignment()
+ 
+        elif newQuestionType == 'Multiple Choice':
+            print()
+            print("LAST QUESTION")
+            print("-------------")
+            displayQuestion(assign_id, numQuestions, "editAssignment")
+            print()
+            while True:
+                print()
+                newMultipleChoiceQuestion = input('Enter The New Question: ')
+                if newMultipleChoiceQuestion.lower() == 'c':
+                    prof_issue_assignment()
+                    break
+                if newMultipleChoiceQuestion != '':
+                    break
+
+            answer_choices = ['a.','b.','c.','d.']
+            tmp_prompt_answer = {}
+
+            for choice in answer_choices:
+                while True:
+                    assigned_ans_prompt = input(f"{choice.replace('.', '')}: ")
+                    if assigned_ans_prompt != '':
+                        break
+                    if assigned_ans_prompt.lower() == 'c':
+                        prof_issue_assignment()
+                        break
+                tmp_prompt_answer.update({choice: assigned_ans_prompt})
+
+            print()   
+            while True:
+                newCorrectAnswer = input("Enter The Correct Answer: ").lower()
+                newCorrectAnswer += '.'
+                if newCorrectAnswer not in answer_choices:
+                    print("Invalid Correct Answer. Enter a,b,c or d")
+                else:
+                    break
+
+            # STORE ALL THE PROMPT ANSWERS
+            prompt_ans_to_store = f"a. {tmp_prompt_answer['a.']}\nb. {tmp_prompt_answer['b.']}\nc. {tmp_prompt_answer['c.']}\nd. {tmp_prompt_answer['d.']}"
+
+            while True:
+                print()
+                confirmation = input("CONFIRMATION: Are You Sure You Want To Add This Question? ").lower()
+                if confirmation in ['yes', 'no']:
+                    break
+
+            if confirmation == 'yes':
+                # ADD QUESTION TO THE ASSIGNMENT
+                numDatabaseColumns = 14
+
+                sql = "INSERT INTO assignments VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                assign_id, assign_type, title, description, question_num, questions, answer_prompt_num, answer_promtps, correct_answer_num, correct_answer, prof_id, duration, due_date, course_name = [oldValue[0][i] for i in range(numDatabaseColumns)]
+                val = (assign_id, assign_type, title, description, (numQuestions+1), newMultipleChoiceQuestion, (numQuestions+1), prompt_ans_to_store, (numQuestions+1), newCorrectAnswer, prof_id, duration, due_date, course_name)
+                db.execute(sql, val)
+                mydb.commit()
+                while True:
+                    print()
+                    back = input("Multiple Choice Question Added. Press (B) to Go Back:").lower()
+                    if back == 'b':
+                        prof_issue_assignment()
+                        break
+            elif confirmation == 'no':
+                prof_issue_assignment()
+
+    elif editToMake == 'Delete Question':
+        print()
+        print("DELETE QUESTION")
+        print("---------------")
+        while True:
+            print()
+            questionNumToDelete = input("Enter The Question Number: ")
+            if questionNumToDelete not in [str(i+1) for i in range(numQuestions)]:
+                print("Invalid Question Number")
+            else:
+                break
+        displayQuestion(assign_id, int(questionNumToDelete), 'editAssignment')
+        print()
+        while True:
+            print()
+            confirmation = input("CONFIRMATION: Are You Sure Want To Delete This Question? ")
+            if confirmation in ['yes', 'no']:
+                break
+
+        if confirmation == 'yes':
+            sql = "DELETE FROM assignments WHERE question_num = %s AND id = %s"
+            val = (int(questionNumToDelete), assign_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+            while True:
+                print()
+                back = input("Question Deleted. Press (B) To Go Back: ").lower()
+                if back == 'b':
+                    prof_issue_assignment()
+                    break
+        elif confirmation == 'no':
+            prof_issue_assignment()
+
+
+    # REGULAR EDITS
+    print()
+    print(f"EDIT {editToMake.upper()}")
+    print('-----' + '-'*len(editToMake))
+    while True:
+        print()
+        newEdit = input(f"Enter The New {editToMake}: ")
+        if newEdit.lower() == 'c':
+            prof_issue_assignment()
+            break
+        if newEdit == oldValue:
+            print(f"That Is Already The Name Of The {editToMake}")
+            print()
+        if newEdit != oldValue and newEdit != '':
+            break
+    # CONFIRMATION
+    while True:
+        print()
+        confirmation = input(f"CONFIRMATION: Are You Sure You Want To Edit The {editToMake} Of This Assignment? ").lower()
+        if confirmation == "yes" or confirmation == "no":
+            break
+    if confirmation == "yes":
+        sql = f"UPDATE assignments SET {columnName} = %s WHERE id = %s"
+        val = (newEdit, assign_id)
+        db.execute(sql, val)
+        mydb.commit()
+        while True:
+            print()
+            back = input(f"Assignment {editToMake} Changed. Press (B) To Go Back: ").lower()
+            if back == "b":
+                prof_issue_assignment()
+                break
+    else:
+        prof_issue_assignment()
+
+def displayQuestion(assign_id: int, question_num: int, calledFrom):
+    if questionIsShortAnswer(assign_id, question_num):
+        sql = "SELECT questions FROM assignments WHERE question_num = %s AND id = %s"
+        val = (question_num, assign_id)
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            errorLoadingQuestion(calledFrom)
+        Question = results[0][0]
+        print()
+        print(f'{question_num}.{Question}')
+        
+    else:
+        sql = 'SELECT questions, answer_prompts, correct_answer FROM assignments WHERE question_num = %s AND id = %s'
+        val = (question_num, assign_id)
+        db.execute(sql, val)
+        results = db.fetchall()
+        if len(results) == 0:
+            errorLoadingQuestion(calledFrom)
+        Question = results[0][0]
+        answerPromtps = results[0][1]
+        correctAnswer = results[0][2]
+        print()
+        print(f'{question_num}.{Question}')
+        print(answerPromtps)
+        print(f'Correct Answer: {correctAnswer}')
+        
+
+
+
+def errorLoadingQuestion(calledFrom):
+    while True:
+        print()
+        error = input('Error Displaying Question. Press (B) To Go Back').lower()
+        if error == 'b':
+            if calledFrom == 'editAssignment':
+                prof_issue_assignment()
+                break
+
 # DELETE ASSIGNMENT
 def delete_assignment(assignment_title):
     while True:
@@ -5797,6 +6341,37 @@ def delete_assignment(assignment_title):
     elif confirmation == "no":
         prof_issue_assignment()
 
+
+# ASSIGNMENT IS SHORT ANSWER
+def assignmentIsShortAnswer(assign_info):
+    for i in range(len(assign_info)):
+        if assign_info[i][6] != None and assign_info[i][7] != None and assign_info[i][8] != None and assign_info[i][9] != None:
+            return False
+    return True
+def assignmentIsMixed(assign_info):
+    multiple_choice_questions = 0
+    short_ans_questions = 0
+    for i in range(len(assign_info)):
+        if assign_info[i][6] != None and assign_info[i][7] != None and assign_info[i][8] != None and assign_info[i][9] != None:
+            multiple_choice_questions += 1
+        else:
+            short_ans_questions += 1
+    return multiple_choice_questions != 0 and short_ans_questions != 0
+def assignmentIsMultipleChoice(assign_info):
+    for i in range(len(assign_info)):
+        if assign_info[i][6] == None and assign_info[i][7] == None and assign_info[i][8] == None and assign_info[i][9] == None:
+            return False
+    return True
+
+
+# UNABLE TO OPEN ASSIGNMENT
+def unable_to_open_assign():
+    while True:
+        print()
+        error = input("Unable To Load Assignment. Press (B) To Go Back: ")
+        if error == 'b':
+            prof_issue_assignment()
+            break
 
 # STUDENT MENU
 def StudentMenu(name):
@@ -5880,7 +6455,7 @@ def view_student_profile():
     print(f"Phone Number: {Stu.getPhoneNumber()}")
     print(f"Courses Enrolled In: {Stu.getCoursesEnrolledIn().split() if result[6] != None else Stu.getCoursesEnrolledIn()}")
     print(f"Grades: ", [Stu.getGrades().split()[i+i] + " " + Stu.getGrades().split()[i+i+1] for i in range(len(Stu.getGrades().split()) // 2)] if result[7] != None else Stu.getGrades())
-    print(f"GPA: {Stu.getGPA()}")
+    print(f"GPA: {Stu.getGPA() if Stu.getGrades() != None else None}")
     print(f"Major: {Stu.getMajor()}")
     print("-" * len(Stu.getAddress()) + "---------")
     print()
@@ -6001,21 +6576,28 @@ def student_inbox():
     if len(all_notifications) == 0:
         print("No Notifications")
 
-
+    terminal_size = os.get_terminal_size().columns
     for i in range(len(all_notifications)):
         # AUTO FIT THE BROKEN LINES
-        max_len_of_attributes = max([len(all_notifications[i][1]), len(all_notifications[i][2])])
-        if max_len_of_attributes == len(all_notifications[i][1]):
-            broken_line_added = "-" * len("Message: ")
-        else:
-            broken_line_added = "-" * len("Received From: ")
+        message_len = len(all_notifications[i][1]) + len('Message: ')
+        received_from_len = len(all_notifications[i][2]) + len('Received From: ')
 
-        print("-" * max_len_of_attributes + broken_line_added)
+        max_len_of_attributes = max([message_len, received_from_len])
+
+        if max_len_of_attributes > terminal_size:
+            broken_line_added = '-' * terminal_size
+        else:
+            if max_len_of_attributes == message_len:
+                broken_line_added = '-' * message_len
+            else:
+                broken_line_added = '-' * received_from_len
+
+        print(broken_line_added)
         print(f"Id: {all_notifications[i][0]}")
         print(f"Date: {all_notifications[i][3]}")
         print(f"Received From: {all_notifications[i][2]}")
         print(f"Message: {all_notifications[i][1]}")
-        print("-" * max_len_of_attributes + broken_line_added)
+        print(broken_line_added)
         print()
 
     while True:
@@ -6185,12 +6767,15 @@ def take_assign(assignment_id):
     val = (assignment_id,)
     db.execute(sql, val)
     results = db.fetchall()
+    if len(results) == 0:
+        assignment_no_longer_available()
     assign_type = results[0][1]
     title = results[0][2]
     description = results[0][3]
     duration = results[0][11]
     due_date = results[0][12]
     course_name = results[0][13]
+    prof_id = results[0][10]
 
     num_assign_questions = len(results)
 
@@ -6209,8 +6794,7 @@ def take_assign(assignment_id):
                 break
 
     # THE ASSIGNMENT IS SHORT ANSWER
-    if results[0][6] == None and results[0][7] == None and results[0][8] == None and results[0][9] == None:
-        prof_id = results[0][10]
+    if assignmentIsShortAnswer(results):
         print(f"<<<<<<<<<< {title} >>>>>>>>>>")
         print()
         print(f"Duration: {duration} Mins")
@@ -6258,65 +6842,172 @@ def take_assign(assignment_id):
             print()
             back = input("Assignment Complete. Press (M) To Return To Student Menu: ").lower()
             if back == "m":
-                StudentMenu(None)
+                StudentMenu(stu_name)
+                break
 
     # THE ASSIGNMENT IS MULTIPLE CHOICE
-    # TODO - CHECK FOR INVALID ASSIGNMENT(IF ANY IMPORTANT INFO IS NONE) AND RETURN AN ERROR MESSAGE TO THE STUDENT
-    # RETRIEVE THE CORRECT ANSWERS
-    assign_answers = {}
-    for i in range(len(results)):
-        assign_answers.update({results[i][8]: results[i][9]})
-    print(f"<<<<<<<<<< {title} >>>>>>>>>>")
-    print()
-    print(f"Duration: {duration} Mins")
-    print(f"Due Date: {due_date}")
-    print(f"Number Of Questions: {num_assign_questions}")
-    print()
-    if description != None:
-        print("-" * len(description))
-        print(description)
-        print("-" * len(description))
+    
+    elif assignmentIsMultipleChoice(results):
+        # RETRIEVE THE CORRECT ANSWERS
+        assign_answers = {}
+        for i in range(len(results)):
+            assign_answers.update({results[i][8]: results[i][9]})
+        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
+        print()
+        print(f"Duration: {duration} Mins")
+        print(f"Due Date: {due_date}")
+        print(f"Number Of Questions: {num_assign_questions}")
+        print()
+        if description != None:
+            print("-" * len(description))
+            print(description)
+            print("-" * len(description))
+            print()
+
+        student_answers = {}
+
+        for i in range(num_assign_questions):
+            print(f"{i + 1}.{results[i][5]}")
+            print(results[i][7])
+            while True:
+                answer = input("Answer: ")
+                if answer in ['a', 'b', 'c', 'd']:
+                    break
+            student_answers.update({i + 1: answer})
+            print()
+
+        grade = checkAssignment(assign_answers, student_answers, num_assign_questions)[0]
+        stu_correct_answers = checkAssignment(assign_answers, student_answers, num_assign_questions)[1]
+        stu_incorrect_answers = checkAssignment(assign_answers, student_answers, num_assign_questions)[2]
+        print()
+        print(f"<<<<<<<<<< RESULT >>>>>>>>>>")
+        print()
+        print(f"GRADE: {grade}")
+        print(f"Questions You Got Correct: {stu_correct_answers}")
+        print(f"Questions You Got Incorrect: {stu_incorrect_answers}")
         print()
 
-    student_answers = {}
+        if assign_type == "Quiz":
+            print("Press (R) To Retake Quiz:")
 
-    for i in range(num_assign_questions):
-        print(f"{i + 1}.{results[i][5]}")
-        print(results[i][7])
         while True:
-            answer = input("Answer: ")
-            if answer in ['a', 'b', 'c', 'd']:
+            back = input("Press (M) To Return To Student Menu: ").lower()
+            if back == "r" and assign_type == "Quiz":
+                take_assign(assignment_id)
                 break
-        student_answers.update({i + 1: answer})
+            elif back == "m":
+                # UPDATE STUDENT GRADE BOOK
+                prof_name = getProfessorName(prof_id)
+                assignment_grade = grade.replace(' ', '')
+                update_grade_book(course_name, stu_id, assignment_grade, prof_name)
+
+                mydb.commit()
+
+                StudentMenu(stu_name)
+
+    elif assignmentIsMixed(results):
+        # RETRIEVE THE CORRECT ANSWERS
+        assign_answers = {}
+        for i in range(len(results)):
+            if not questionIsShortAnswer(assignment_id, i+1):
+                assign_answers.update({results[i][8]: results[i][9]})
+        prof_id = results[0][10]
+        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
         print()
+        print(f"Duration: {duration} Mins")
+        print(f"Due Date: {due_date}")
+        print(f"Number Of Questions: {num_assign_questions}")
+        print()
+        if description != None:
+            print("-" * len(description))
+            print(description)
+            print("-" * len(description))
+            print()
 
-    grade = checkAssignment(assign_answers, student_answers, num_assign_questions)[0]
-    stu_correct_answers = checkAssignment(assign_answers, student_answers, num_assign_questions)[1]
-    stu_incorrect_answers = checkAssignment(assign_answers, student_answers, num_assign_questions)[2]
-    print()
-    print(f"<<<<<<<<<< RESULT >>>>>>>>>>")
-    print()
-    print(f"GRADE: {grade}")
-    print(f"Questions You Got Correct: {stu_correct_answers}")
-    print(f"Questions You Got Incorrect: {stu_incorrect_answers}")
-    print()
+        shortAnswers = {}
+        multipleChoiceAnswers = {}
+        multiple_choice_question_count = 0
 
-    if assign_type == "Quiz":
-        print("Press (R) To Retake Quiz:")
 
+        for i in range(num_assign_questions):
+            if questionIsShortAnswer(assignment_id, i+1):
+                print(f"{i + 1}.{results[i][5]}")
+                while True:
+                    answer = input("Answer: ")
+                    if answer != '':
+                        break
+                shortAnswers.update({i + 1: answer})
+                print()
+            else:
+                print(f"{i + 1}.{results[i][5]}")
+                print(results[i][7])
+                while True:
+                    answer = input("Answer: ")
+                    if answer in ['a', 'b', 'c', 'd']:
+                        break
+                multipleChoiceAnswers.update({i + 1: answer})
+                multiple_choice_question_count += 1
+                print()
+
+        grade = checkAssignment(assign_answers, multipleChoiceAnswers, multiple_choice_question_count)[0]
+        stu_correct_answers = checkAssignment(assign_answers, multipleChoiceAnswers, num_assign_questions)[1]
+        # stu_incorrect_answers = checkAssignment(assign_answers, multipleChoiceAnswers, num_assign_questions)[2]
+
+        answers_to_add_to_db = ""
+        for ans in shortAnswers:
+            answers_to_add_to_db += f"{ans}.{shortAnswers[ans]}\n"
+            answers_to_add_to_db += "\n"
+
+
+
+        # SEND ASSIGNMENT TO PROFESSOR
+        notification = f"{stu_name}({stu_id}) Submitted {title} ID: {assignment_id}"
+        received_from = f"Student ({stu_name})"
+
+        sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+        val = (notification, received_from, now, prof_id)
+        db.execute(sql, val)
+        mydb.commit()
+
+        # ADD ASSIGNMENT TO DATABASE
+        message = f"Multiple Choice Answers: {str(multipleChoiceAnswers)} Grade: {grade}"
+        sql = "INSERT INTO assignment_submissions (stu_id, assignment_id, answers, message) VALUES (%s, %s, %s, %s)"
+        val = (stu_id, assignment_id, answers_to_add_to_db, message)
+        db.execute(sql, val)
+        mydb.commit()
+
+        print(f"<<<<<<<<<< RESULT >>>>>>>>>>")
+        print()
+        print(f"MULTIPLE CHOICE GRADE: {grade}")
+        print(f"You Got Correct: {len(stu_correct_answers)} Out Of {multiple_choice_question_count} Multiple Choice Questions Correct")
+        while True:
+            print()
+            back = input("Your Short Answers Have Been Submitted. Press (M) To Return To Main Menu: ").lower()
+            if back == 'm':
+                StudentMenu(stu_name)
+
+        while True:
+            print()
+            back = input("Assignment Complete. Press (M) To Return To Student Menu: ").lower()
+            if back == "m":
+                StudentMenu(stu_name)
+                break
+
+def questionIsShortAnswer(assign_id, question_num):
+    sql = "SELECT * FROM assignments WHERE id = %s AND question_num = %s"
+    val = (assign_id, question_num)
+    db.execute(sql, val)
+    results = db.fetchall()
+
+    return results[0][6] == None and results[0][7] == None and results[0][8] == None and results[0][9] == None
+
+def assignment_no_longer_available():
     while True:
-        back = input("Press (M) To Return To Student Menu: ").lower()
-        if back == "r" and assign_type == "Quiz":
-            take_assign(assignment_id)
+        print()
+        error = input("This Assignment Is No Longer Available. Contact The Professor.\n\nPress (B) To Go Back:").lower()
+        if error == "b":
+            StudentMenu(stu_name)
             break
-        elif back == "m":
-            # UPDATE STUDENT GRADE BOOK
-            assignment_grade = grade.replace(' ', '')
-            update_grade_book(course_name, stu_id, assignment_grade)
-
-            mydb.commit()
-
-            StudentMenu(None)
 
 
 def checkAssignment(correct_answers, student_answers, num_questions):
@@ -6370,10 +7061,10 @@ def isDue(due_date):
     except:
         return False
 
-def update_grade_book(course_name, stu_id, assign_grade):
+def update_grade_book(course_name, stu_id, assign_grade, prof_name):
     # UPDATE STUDENT GRADE BOOK
     sql = "SELECT * FROM grade_book WHERE stu_id = %s AND course_name = %s"
-    val = (stu_id,course_name)
+    val = (stu_id, course_name)
     db.execute(sql, val)
     results = db.fetchall()
     if len(results) == 0:
@@ -6397,8 +7088,16 @@ def update_grade_book(course_name, stu_id, assign_grade):
         results = db.fetchall()
         if len(results) != 0:
             if grade_book[grade] == None:
-                sql = f"UPDATE grade_book SET {grade} = %s WHERE stu_id = %s"
-                val = (assignment_grade, stu_id)
+                sql = f"UPDATE grade_book SET {grade} = %s WHERE stu_id = %s AND course_name = %s"
+                val = (assignment_grade, stu_id, course_name)
+                db.execute(sql, val)
+                mydb.commit()
+                # SEND STUDENT A NOTIFICATION
+                senderType = 'Professor'
+                senderName = prof_name
+                message = f"Your {course_name} Grade Has Been Updated To: {assignment_grade}"
+                sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+                val = (message, f"{senderType} ({senderName})", now, stu_id)
                 db.execute(sql, val)
                 mydb.commit()
                 return
@@ -6407,11 +7106,29 @@ def update_grade_book(course_name, stu_id, assign_grade):
             val = (stu_id, course_name, assignment_grade)
             db.execute(sql, val)
             mydb.commit()
+             # SEND STUDENT A NOTIFICATION
+            senderType = 'Professor'
+            senderName = prof_name
+            message = f"Your {course_name} Grade Has Been Updated To: {assignment_grade}"
+            sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+            val = (message, f"{senderType} ({senderName})", now, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
             return
     sql = "UPDATE grade_book SET grade_5 = %s WHERE stu_id = %s AND course_name = %s"
     val = (assignment_grade, stu_id, course_name)
     db.execute(sql, val)
     mydb.commit()
+     # SEND STUDENT A NOTIFICATION
+    senderType = 'Professor'
+    senderName = prof_name
+    message = f"Your {course_name} Grade Has Been Updated To: {assignment_grade}"
+    sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+    val = (message, f"{senderType} ({senderName})", now, stu_id)
+    db.execute(sql, val)
+    mydb.commit()
+
+
 # FILTER STUDENT NOTIFICATIONS
 def filter_stu_notification_by_date(notifications):
     while True:
@@ -7017,6 +7734,7 @@ def convo_view(convoId, user, respondOnOpen=False):
 
     received_from = ''
     showDates = False
+    seenMessages = set()
     for item in results:
         print()
         date = item[1]
@@ -7028,11 +7746,11 @@ def convo_view(convoId, user, respondOnOpen=False):
         if showDates:
             print(date)
 
-        if receiverMessages != None:
+        if receiverMessages != None and receiverMessages not in seenMessages:
             print(f'[{receivedFrom}]: {receiverMessages}')
-        # print()
         print()
         print(f"[You]: {userMessages}")
+        seenMessages.add(receiverMessages)
 
     if respondOnOpen:
         if user == 'Dean':
@@ -7041,9 +7759,14 @@ def convo_view(convoId, user, respondOnOpen=False):
             db_table = 'professor_notification'
         elif user == 'Student':
             db_table ='student_notification'
+
         senderName = getSenderInfo(convoId)['Name']
         senderType = getSenderInfo(convoId)['Type']
+        receiverName = getReceiverInfo(convoId)['Name']
+        receiverType = getReceiverInfo(convoId)['Type']         
+
         like_query = f'%{received_from}%'
+
         sql = f"SELECT notification FROM {db_table} WHERE received_from LIKE %s"
         val = (like_query, )
         db.execute(sql, val)
@@ -7053,7 +7776,7 @@ def convo_view(convoId, user, respondOnOpen=False):
         print()
         if received_from != '':
             last_message = results[-1][0]
-            if receiverMessages != last_message:
+            if receiverMessages != last_message and showLastMessage(senderName, senderType, receiverName, receiverType, convoId):
                 print(f'[{received_from}]: {last_message}')
         else:
             last_message = None
@@ -7066,25 +7789,70 @@ def convo_view(convoId, user, respondOnOpen=False):
                 break
             if message != '':
                 break
-        # CREATE CONVERSATION
-        conversationInfo = {
-            'convoId': convoId,
-            'date': now,
-            'senderType': senderType,
-            'senderName': senderName,
-            'preMessage': last_message,
-            'senderMessage': message,
-            'receivedFrom': received_from if received_from != '' else None
-        }
-        createConversation(conversationInfo)
-        if senderType == 'Student':
-            pass
+        while True:
+            print()
+            confirmation = input("CONFIRMATION: Are You Sure Want To Send This Message? ").lower()
+            if confirmation == 'yes' or confirmation == 'no':
+                break
+        if confirmation == 'yes':
+            # CREATE CONVERSATION
+            conversationInfo = {
+                'convoId': convoId,
+                'date': now,
+                'senderType': senderType,
+                'senderName': senderName,
+                'preMessage': last_message,
+                'senderMessage': message,
+                'receivedFrom': received_from if received_from != '' else None
+            }
+            createConversation(conversationInfo)
 
-        sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
-        val = (message, f"{senderType} ({senderName})", now, )
-        db.execute(sql, val)
-        mydb.commit()
-    # print(f"Last msg: {}")
+            
+            if receiverType == 'Student':
+                stu_id = get_student_id(receiverName)
+                sql = "INSERT INTO student_notification (notification, received_from, date, stu_id) VALUES (%s, %s, %s, %s)"
+                val = (message, f"{senderType} ({senderName})", now, stu_id)
+                db.execute(sql, val)
+                mydb.commit()
+            elif receiverType == 'Professor':
+                prof_id = get_professor_id(receiverName)
+                sql = "INSERT INTO professor_notification (notification, received_from, date, prof_id) VALUES (%s, %s, %s, %s)"
+                val = (message, f"{senderType} ({senderName})", now, prof_id)
+                db.execute(sql, val)
+                mydb.commit()
+            elif receiverType == 'Dean':
+                if senderType == 'Student':
+                    person_id = get_student_id(stu_name)
+                elif senderType == 'Professor':
+                    person_id = get_professor_id(prof_name)
+                elif senderType == 'Dean':
+                    person_id = get_dean_id(dean_name)
+                sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
+                val = (message, f"{senderType} ({senderName})", person_id)
+                db.execute(sql, val)
+                mydb.commit()
+
+            while True:
+                print()
+                back = input("Message Sent. Press (B) To Go Back: ").lower()
+                if back == 'b':
+                    if senderType == 'Student':
+                        StudentMenu(stu_name)
+                        break
+                    elif senderType == 'Professor':
+                        ProfessorMenu(prof_name)
+                        break
+                    elif senderType == 'Dean':
+                        DeanMenu(dean_name)
+                        break
+        elif confirmation == 'no':
+            if senderType == 'Student':
+                StudentMenu(stu_name)
+            elif senderType == 'Professor':
+                ProfessorMenu(prof_name)
+            elif senderType == 'Dean':
+                DeanMenu(dean_name)
+
 
 def getSenderInfo(convoID):
     senderInfo = {}
@@ -7093,6 +7861,40 @@ def getSenderInfo(convoID):
     type = convoID[indexOf(convoID, '(', 1)+1:indexOf(convoID, ')', 1)]
     senderInfo.update({'Type': type})
     return senderInfo
+
+def getReceiverInfo(convoID):
+    # Kim Roberts(Professor) To Jaheim Archibald(Dean)
+    receiverInfo = {}
+
+    receiverNameAndType = convoID.split('To')[1]
+
+    receiverName = receiverNameAndType[:indexOf(receiverNameAndType, '(')].lstrip()
+    receiverInfo.update({'Name': receiverName})
+
+    receiverType = receiverNameAndType[indexOf(receiverNameAndType, '(')+1:indexOf(receiverNameAndType, ')')]
+    receiverInfo.update({'Type': receiverType})
+    return receiverInfo
+
+
+def showLastMessage(senderName, senderType, receiverName, receiverType, convoId):
+    # DETERMINE WHETHER THE PERSON HAS RESPONDED
+    sql = "SELECT senderMessage FROM Conversations WHERE convoId = %s"
+    val = (convoId, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return False
+
+    lastSentMessage = results[0][-1]
+    reverse_convo_id = f'{receiverName}({receiverType}) To {senderName}({senderType})'
+    sql = "SELECT * FROM Conversations WHERE convoId = %s AND preMessage = %s"
+    val = (reverse_convo_id, lastSentMessage)
+    db.execute(sql, val)
+    results2 = db.fetchall()
+    if len(results2) == 0:
+        return False
+    return True
+    
 
 # VIEW ALL COURSES
 def view_all_courses_stu():
@@ -7247,8 +8049,9 @@ def enroll_in_course(course_name):
         mydb.commit()
 
         # SET UP NOTIFICATION
+        message = f"{stu_name} Enrolled In: {course_name}"
         sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
-        val = (f"{stu_name} Enrolled In: {course_name}", "Student", now, Stu.getID())
+        val = (message, f"Student ({stu_name})", now, Stu.getID())
         db.execute(sql, val)
         mydb.commit()
 
@@ -7329,8 +8132,9 @@ def drop_class(student_id, courses_enrolled_in, name_of_class=None):
         mydb.commit()
 
         # SET UP NOTIFICATION
+        message = f"{stu_name} Dropped: {class_to_drop}"
         sql = "INSERT INTO dean_notification (notification, received_from, date, person_id) VALUES (%s, %s, %s, %s)"
-        val = (f"{stu_name} Dropped: {class_to_drop}", "Student", now, student_id)
+        val = (message, f"Student ({stu_name})", now, student_id)
         db.execute(sql, val)
         mydb.commit()
 
@@ -7340,7 +8144,7 @@ def drop_class(student_id, courses_enrolled_in, name_of_class=None):
             print()
             back = input("Press (M) To Return To Student Menu: ").lower()
             if back == "m":
-                StudentMenu(None)
+                StudentMenu(stu_name)
 
     else:
         StudentMenu(None)
@@ -7603,6 +8407,18 @@ def indexOf(string, index_of, specific_index=None):
         if string[i] == index_of:
             return i
 
+def permuteString(string):
+    if len(string) == 1:
+        return [string]
+    perms = permuteString(string[1:])
+    char = string[0]
+    result = []
+    for perm in perms:
+        for i in range(len(perm)+1):
+            result.append(perm[:i] + char + perm[i:])
+
+    return result
+
 # GET ID
 def get_student_id(name):
     sql = "SELECT id FROM Student WHERE name = %s"
@@ -7610,7 +8426,7 @@ def get_student_id(name):
     db.execute(sql, val)
     results = db.fetchall()
     if len(results) == 0:
-        return
+        return None
     student_id = results[0][0]
     return student_id
 def get_professor_id(name):
@@ -7619,9 +8435,26 @@ def get_professor_id(name):
     db.execute(sql, val)
     results = db.fetchall()
     if len(results) == 0:
-        return
+        return None
     prof_id = results[0][0]
     return prof_id
+def getProfessorName(prof_id):
+    sql = "SELECT name FROM Professor WHERE id = %s"
+    val = (prof_id, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return None
+    return results[0][0]
+def get_dean_id(name):
+    sql = "SELECT id FROM Dean WHERE name = %s"
+    val = (name, )
+    db.execute(sql, val)
+    results = db.fetchall()
+    if len(results) == 0:
+        return None
+    dean_id = results[0][0]
+    return dean_id
 def reset_password(came_from):
     global password_attempts
     if came_from == "Dean":
@@ -7843,33 +8676,39 @@ def update_student_grades():
         course_names = [results[i][2] for i in range(len(results))]
 
         # RETRIEVE ONLY THE GRADES FROM THE RESULTS
-        results = [results[i][3:] for i in range(len(results))]
-        for i in range(len(course_names)):
-            grades_to_avg = [grade for grade in results[i] if grade != None]
-            # UPDATE course_grades USING THE COURSE NAME AND THE AVG OF THEIR 5 GRADES FOR THAT COURSE
-            course_grades.update({course_names[i]: str(compute_average(grades_to_avg)) + "%"})
-
-        # CONVERT THE DICT TO A STRING
-        grades_to_add_to_database = ""
-        for grade in course_grades:
-            grades_to_add_to_database += f"{grade}: {course_grades[grade]}"
-            grades_to_add_to_database += " "
-
-       # COMPUTE THE STUDENT'S OVERALL AVG USING ALL THEIR COURSE AVERAGES
-        student_grade_avg_for_each_grade_book = []
-        for i in range(len(results)):
-            grades_to_avg = [grade for grade in results[i] if grade != None]
-            student_grade_avg_for_each_grade_book.append(compute_average(grades_to_avg))
-        try:
-            studentAverage = round(sum(student_grade_avg_for_each_grade_book) // len(student_grade_avg_for_each_grade_book))
-        except ZeroDivisionError:
-            studentAverage = None
-        grades_to_add_to_database += f"AVG: {studentAverage}%"
-
-        # UPDATE THE DATABASE
         if stu_id != None:
+            results = [results[i][3:] for i in range(len(results))]
+            for i in range(len(course_names)):
+                grades_to_avg = [grade for grade in results[i] if grade != None]
+                # UPDATE course_grades USING THE COURSE NAME AND THE AVG OF THEIR 5 GRADES FOR THAT COURSE
+                course_grades.update({course_names[i]: str(compute_average(grades_to_avg)) + "%"})
+
+            # CONVERT THE DICT TO A STRING
+            grades_to_add_to_database = ""
+            for grade in course_grades:
+                grades_to_add_to_database += f"{grade}: {course_grades[grade]}"
+                grades_to_add_to_database += " "
+
+           # COMPUTE THE STUDENT'S OVERALL AVG USING ALL THEIR COURSE AVERAGES
+            student_grade_avg_for_each_grade_book = []
+            for i in range(len(results)):
+                grades_to_avg = [grade for grade in results[i] if grade != None]
+                student_grade_avg_for_each_grade_book.append(compute_average(grades_to_avg))
+            try:
+                studentAverage = round(sum(student_grade_avg_for_each_grade_book) // len(student_grade_avg_for_each_grade_book))
+            except ZeroDivisionError:
+                studentAverage = None
+            grades_to_add_to_database += f"AVG: {studentAverage}%"
+
+            # UPDATE THE DATABASE
             sql = "UPDATE Student SET grades = %s WHERE id = %s"
             val = (grades_to_add_to_database, stu_id)
+            db.execute(sql, val)
+            mydb.commit()
+
+        if stu_id == None:
+            sql = "UPDATE Student SET grades = %s WHERE id = %s"
+            val = (None, id)
             db.execute(sql, val)
             mydb.commit()
 
