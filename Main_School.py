@@ -8,8 +8,7 @@ try:
 except ImportError:
     print("Import Error: Do pip install mysql.connector-python To Use This Program")
     exit()
-from datetime import date
-
+from datetime import date, datetime
 current_date = date.today()
 now = current_date.strftime("%B %d, %Y")
 
@@ -4865,33 +4864,36 @@ def professor_inbox():
         print(broken_line_added)
         print()
 
+
+    print()
+    print("Press (CON) To View All Conversations:")
+    print()
+    print("Press (O) To Open A Notification:")
+    print()
+    print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
+    print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
+    print("Press (M) To Filter By Message:           |  Press (S) To Return To Professor Menu:")
+    print()
     while True:
-        print()
-        print("Press (CON) To View All Conversations:")
-        print()
-        print("Press (O) To Open A Notification:")
-        print()
-        print("Press (D) To Filter By Date:              |  Press (C) To Clear A Notification:")
-        print("Press (F) To Filter By Received From:     |  Press (CA) To Clear All Notifications:")
-        print("Press (M) To Filter By Message:           |  Press (S) To Return To Professor Menu:")
-        print()
-        filter = input("Choose An Option: ")
-        if filter == 'con':
-            view_all_conversations(prof_name, 'Professor')
-        elif filter == "o":
-            open_prof_notification(all_notifications)
-        elif filter == "d":
-            filter_prof_notification_by_date(all_notifications)
-        elif filter == "f":
-            filter_prof_notification_by_received_from(all_notifications)
-        elif filter == "m":
-            filter_prof_notification_by_message(all_notifications)
-        elif filter == "c":
-            clear_professor_notification()
-        elif filter == "ca":
-            clear_all_professor_notifications(Prof.getID())
-        elif filter == "s":
-            ProfessorMenu(None)
+        filter = input("Choose An Option: ").lower()
+        if filter in ['con','o','d','f','m','c','ca','s']:
+            break
+    if filter == 'con':
+        view_all_conversations(prof_name, 'Professor')
+    elif filter == "o":
+        open_prof_notification(all_notifications)
+    elif filter == "d":
+        filter_prof_notification_by_date(all_notifications)
+    elif filter == "f":
+        filter_prof_notification_by_received_from(all_notifications)
+    elif filter == "m":
+        filter_prof_notification_by_message(all_notifications)
+    elif filter == "c":
+        clear_professor_notification()
+    elif filter == "ca":
+        clear_all_professor_notifications(Prof.getID())
+    elif filter == "s":
+        ProfessorMenu(prof_name)
 
 # OPEN NOTIFICATION
 def open_prof_notification(notification):
@@ -6405,7 +6407,7 @@ def StudentMenu(name):
     print()
     while True:
         stu_choice = input("Choose An Option: ").lower()
-        if stu_choice != '':
+        if stu_choice in ['1', '2' , '3', 'i', 's', 'l']:
             break
 
     if stu_choice == "l":
@@ -6776,8 +6778,24 @@ def take_assign(assignment_id):
     due_date = results[0][12]
     course_name = results[0][13]
     prof_id = results[0][10]
-
     num_assign_questions = len(results)
+    answer_prompts = [results[i][7] for i in range(num_assign_questions)]
+
+    now = datetime.now()
+    currentTime = now.strftime("%H:%M:%S")
+    endTime = initializeEndTime(currentTime, duration)
+
+    allQuestions = [results[i][5] for i in range(num_assign_questions)]
+    allAnswers = []
+    assignInfo = {
+        'Title': title,
+        'Duration': duration,
+        'Due Date': due_date,
+        'Num_Questions': num_assign_questions,
+        'Description': description,
+        'End Time': endTime,
+        'Answer Prompts': answer_prompts,
+    }
 
     # CHECKING IF THE DUE DATE HAS PASSED
     if isDue(due_date):
@@ -6795,26 +6813,22 @@ def take_assign(assignment_id):
 
     # THE ASSIGNMENT IS SHORT ANSWER
     if assignmentIsShortAnswer(results):
-        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
-        print()
-        print(f"Duration: {duration} Mins")
-        print(f"Due Date: {due_date}")
-        print(f"Number Of Questions: {num_assign_questions}")
-        print()
-        if description != None:
-            print("-" * len(description))
-            print(description)
-            print("-" * len(description))
-            print()
-
         student_answers = {}
-
         for i in range(num_assign_questions):
-            print(f"{i + 1}.{results[i][5]}")
+            temp_i = i + 1
+            displayAssignmentInfo(allQuestions, allAnswers, assignInfo, assignment_id, temp_i)
+            if timeElapsed(currentTime, endTime):
+                while True:
+                    print()
+                    back = input('Your Time Has Expired. Your Assignment Has Been Submitted\n\nPress (M) To Return To Student Menu: ').lower()
+                    if back == 'm':
+                        StudentMenu(stu_name)
+                        break
             while True:
                 answer = input("Answer: ")
                 if answer != '':
                     break
+            allAnswers.append(answer)
             student_answers.update({i + 1: answer})
             print()
 
@@ -6846,33 +6860,33 @@ def take_assign(assignment_id):
                 break
 
     # THE ASSIGNMENT IS MULTIPLE CHOICE
-    
     elif assignmentIsMultipleChoice(results):
         # RETRIEVE THE CORRECT ANSWERS
         assign_answers = {}
         for i in range(len(results)):
             assign_answers.update({results[i][8]: results[i][9]})
-        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
-        print()
-        print(f"Duration: {duration} Mins")
-        print(f"Due Date: {due_date}")
-        print(f"Number Of Questions: {num_assign_questions}")
-        print()
-        if description != None:
-            print("-" * len(description))
-            print(description)
-            print("-" * len(description))
-            print()
 
         student_answers = {}
 
         for i in range(num_assign_questions):
-            print(f"{i + 1}.{results[i][5]}")
-            print(results[i][7])
+            temp_i = i+1
+
+            displayAssignmentInfo(allQuestions, allAnswers, assignInfo, assignment_id, temp_i)
+            if timeElapsed(currentTime, endTime):
+                while True:
+                    print()
+                    back = input(
+                        'Your Time Has Expired. Your Assignment Has Been Submitted\n\nPress (M) To Return To Student Menu: ').lower()
+                    if back == 'm':
+                        StudentMenu(stu_name)
+                        break
+            # print(f"{i + 1}.{results[i][5]}")
+            # print(results[i][7])
             while True:
                 answer = input("Answer: ")
                 if answer in ['a', 'b', 'c', 'd']:
                     break
+            allAnswers.append(answer)
             student_answers.update({i + 1: answer})
             print()
 
@@ -6905,6 +6919,7 @@ def take_assign(assignment_id):
 
                 StudentMenu(stu_name)
 
+    # THE ASSIGNMENT IS MIXED
     elif assignmentIsMixed(results):
         # RETRIEVE THE CORRECT ANSWERS
         assign_answers = {}
@@ -6912,17 +6927,6 @@ def take_assign(assignment_id):
             if not questionIsShortAnswer(assignment_id, i+1):
                 assign_answers.update({results[i][8]: results[i][9]})
         prof_id = results[0][10]
-        print(f"<<<<<<<<<< {title} >>>>>>>>>>")
-        print()
-        print(f"Duration: {duration} Mins")
-        print(f"Due Date: {due_date}")
-        print(f"Number Of Questions: {num_assign_questions}")
-        print()
-        if description != None:
-            print("-" * len(description))
-            print(description)
-            print("-" * len(description))
-            print()
 
         shortAnswers = {}
         multipleChoiceAnswers = {}
@@ -6930,21 +6934,38 @@ def take_assign(assignment_id):
 
 
         for i in range(num_assign_questions):
+            temp_i = i + 1
             if questionIsShortAnswer(assignment_id, i+1):
-                print(f"{i + 1}.{results[i][5]}")
+                displayAssignmentInfo(allQuestions, allAnswers, assignInfo, assignment_id, temp_i)
+                if timeElapsed(currentTime, endTime):
+                    while True:
+                        print()
+                        back = input('Your Time Has Expired. Your Assignment Has Been Submitted\n\nPress (M) To Return To Student Menu: ').lower()
+                        if back == 'm':
+                            StudentMenu(stu_name)
+                            break
                 while True:
                     answer = input("Answer: ")
                     if answer != '':
                         break
+                allAnswers.append(answer)
                 shortAnswers.update({i + 1: answer})
                 print()
             else:
-                print(f"{i + 1}.{results[i][5]}")
-                print(results[i][7])
+                displayAssignmentInfo(allQuestions, allAnswers, assignInfo, assignment_id, temp_i)
+                if timeElapsed(currentTime, endTime):
+                    while True:
+                        print()
+                        back = input(
+                            'Your Time Has Expired. Your Assignment Has Been Submitted\n\nPress (M) To Return To Student Menu: ').lower()
+                        if back == 'm':
+                            StudentMenu(stu_name)
+                            break
                 while True:
                     answer = input("Answer: ")
                     if answer in ['a', 'b', 'c', 'd']:
                         break
+                allAnswers.append(answer)
                 multipleChoiceAnswers.update({i + 1: answer})
                 multiple_choice_question_count += 1
                 print()
@@ -6992,6 +7013,43 @@ def take_assign(assignment_id):
             if back == "m":
                 StudentMenu(stu_name)
                 break
+
+def displayAssignmentInfo(allQuestions, allAnswers, assign_info: dict, assignID: int, amountToDisplay: int):
+    clear()
+    displayAssignmentDescription(assign_info)
+    # print()
+    displayAssignmentDuration(assign_info['End Time'])
+    print()
+    for i in range(amountToDisplay):
+        if questionIsShortAnswer(assignID, i+1):
+            print(f'{i+1}.{allQuestions[i]}')
+            print(f'Answer: {allAnswers[i]}\n') if len(allAnswers) > i else None
+        else:
+            print(f'{i + 1}.{allQuestions[i]}')
+            print(assign_info['Answer Prompts'][i])
+            print(f'Answer: {allAnswers[i]}\n') if len(allAnswers) > i else None
+
+
+def displayAssignmentDescription(assign_info):
+    print(f"<<<<<<<<<< {assign_info['Title']} >>>>>>>>>>>")
+    print()
+    print(f"Duration: {assign_info['Duration']} Mins")
+    print(f"Due Date: {assign_info['Due Date']}")
+    print(f"Number Of Questions: {assign_info['Num_Questions']}")
+    if assign_info['Description'] != None:
+        print()
+        print("-" * len(assign_info['Description']))
+        print( assign_info['Description'])
+        print("-" * len( assign_info['Description']))
+        print()
+
+def displayAssignmentDuration(endTime):
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    print('----------------------')
+    print(f'CURRENT TIME: {current_time}')
+    print(f'END TIME: {endTime}')
+    print('----------------------')
 
 def questionIsShortAnswer(assign_id, question_num):
     sql = "SELECT * FROM assignments WHERE id = %s AND question_num = %s"
@@ -7050,9 +7108,13 @@ def isDue(due_date):
         # THE YEAR HAS PASSED
         if Due_Date[2] < Today[2]:
             return True
+        if Due_Date[2] > Today[2]:
+            return False
         # MONTH HAS PASSED
         if Due_Date[0] < Today[0]:
             return True
+        if Due_Date[0] > Today[0]:
+            return False
         # DAY HAS PASSED
         if Due_Date[0] == Today[0]:
             if Due_Date[1] < Today[1]:
@@ -7060,6 +7122,42 @@ def isDue(due_date):
         return False
     except:
         return False
+
+def initializeEndTime(currentTime, duration: int):
+    durationSeconds = duration * 60
+    currentTime = currentTime.split(':')
+    hours, minutes, seconds = int(currentTime[0]), int(currentTime[1]), int(currentTime[2])
+
+    while (durationSeconds) != 0:
+        seconds += 1
+        durationSeconds -= 1
+        if seconds == 60:
+            seconds = 0
+            minutes += 1
+        if minutes == 60:
+            minutes = 0
+            hours += 1
+
+
+    if len(str(hours)) == 1:
+        hours = f'0{str(hours)}'
+    if len(str(minutes)) == 1:
+        minutes = f'0{str(minutes)}'
+    if len(str(seconds)) == 1:
+        seconds = f'0{str(seconds)}'
+
+    endTime = f'{str(hours)}:{str(minutes)}:{str(seconds)}'
+    return endTime
+
+def timeElapsed(currentTime, endTime):
+    currentTime = currentTime.split(':')
+    endTime = endTime.split(':')
+
+    C_hours, C_minutes, C_seconds = int(currentTime[0]), int(currentTime[1]), int(currentTime[2])
+    E_hours, E_minutes, E_seconds = int(endTime[0]), int(endTime[1]), int(endTime[2])
+
+    return (C_hours >= E_hours) and (C_minutes >= E_minutes) and (C_seconds >= E_seconds)
+
 
 def update_grade_book(course_name, stu_id, assign_grade, prof_name):
     # UPDATE STUDENT GRADE BOOK
@@ -7166,7 +7264,7 @@ def filter_stu_notification_by_date(notifications):
         if back == "c":
             clear_student_notification()
         elif back == "s":
-            StudentMenu(None)
+            StudentMenu(stu_name)
 def filter_stu_notification_by_received_from(notifications):
     while True:
         print()
@@ -7204,7 +7302,7 @@ def filter_stu_notification_by_received_from(notifications):
         elif back == "c":
             clear_student_notification()
         elif back == "s":
-            StudentMenu(None)
+            StudentMenu(stu_name)
 def filter_stu_notification_by_message(notifications):
     while True:
         print()
